@@ -1,0 +1,24 @@
+language: python
+sudo: false
+cache: pip
+python:
+- '2.7'
+- '3.5'
+- '3.6'
+env:
+- REQ="Django>=1.10,<1.11"
+- REQ="Django>=1.11,<2.0"
+- REQ="Django>=2.0,<2.1"
+- REQ="https://github.com/django/django/archive/master.zip#egg=Django"
+matrix:
+  allow_failures:
+    - env: REQ="https://github.com/django/django/archive/master.zip#egg=Django"
+  exclude:
+    - python: '2.7'
+      env: REQ="Django>=2.0,<2.1"
+    - python: '2.7'
+      env: REQ="https://github.com/django/django/archive/master.zip#egg=Django"
+install:
+- pip install --upgrade pip wheel
+- pip install "$REQ" nose flake8
+script: nosetests -v && flake8 django_cte/ tests/
