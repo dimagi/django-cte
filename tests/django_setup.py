@@ -1,6 +1,8 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import sys
+
 from django.db import connection
 
 from .models import Region, Order
@@ -13,8 +15,20 @@ def init_db():
     if is_initialized:
         return
     is_initialized = True
-    connection.creation.create_test_db(verbosity=0)
+
+    # replace sys.stdout for prompt to delete database
+    old_stdout = sys.stdout
+    sys.stdout = sys.__stdout__
+    try:
+        connection.creation.create_test_db(verbosity=0)
+    finally:
+        sys.stdout = old_stdout
+
     setup_data()
+
+
+def destroy_db():
+    connection.creation.destroy_test_db(verbosity=0)
 
 
 def setup_data():

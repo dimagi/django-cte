@@ -9,16 +9,10 @@ from django.test import TestCase
 
 from django_cte import With
 
-from .django_setup import init_db
 from .models import Order, Region
 
 int_field = IntegerField()
 text_field = TextField()
-
-
-def setup():
-    """Initialize database for nosetests"""
-    init_db()
 
 
 class TestCTE(TestCase):
