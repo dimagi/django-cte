@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 
 from django.db.models import IntegerField, TextField
 from django.db.models.aggregates import Sum
-from django.db.models.expressions import F, Value
+from django.db.models.expressions import F, OuterRef, Subquery, Value
 from django.db.models.functions import Concat
 from django.test import TestCase
 
@@ -80,4 +80,38 @@ class TestCTE(TestCase):
             ('moon', ['sun', 'earth', 'moon'], 2),
             ('deimos', ['sun', 'mars', 'deimos'], 2),
             ('phobos', ['sun', 'mars', 'phobos'], 2),
+        ])
+
+    def test_cte_queryset(self):
+        sub_totals = With(
+            Order.objects
+            .values(region_parent=F("region__parent_id"))
+            .annotate(total=Sum("amount")),
+        )
+        regions = (
+            Region.objects.all()
+            .with_cte(sub_totals)
+            .annotate(
+                child_regions_total=Subquery(
+                    sub_totals.queryset()
+                    .filter(region_parent=OuterRef("name"))
+                    .values("total")
+                ),
+            )
+            .order_by("name")
+        )
+
+        data = [(r.name, r.child_regions_total) for r in regions]
+        self.assertEqual(data, [
+            ("bernard's star", None),
+            ('deimos', None),
+            ('earth', 6),
+            ('mars', None),
+            ('mercury', None),
+            ('moon', None),
+            ('phobos', None),
+            ('proxima centauri', 33),
+            ('proxima centauri b', None),
+            ('sun', 368),
+            ('venus', None)
         ])

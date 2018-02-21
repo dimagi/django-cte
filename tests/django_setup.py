@@ -43,6 +43,7 @@ def setup_data():
         ("deimos", "mars"),
         ("phobos", "mars"),
         ("proxima centauri", None),
+        ("proxima centauri b", "proxima centauri"),
         ("bernard's star", None),
     ]:
         region = Region(name=name, parent=regions[parent])
@@ -68,6 +69,10 @@ def setup_data():
         ("mars", 40),
         ("mars", 41),
         ("mars", 42),
+        ("proxima centauri", 2000),
+        ("proxima centauri b", 10),
+        ("proxima centauri b", 11),
+        ("proxima centauri b", 12),
     ]:
         order = Order(amount=amount, region=regions[region])
         order.save()
