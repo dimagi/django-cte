@@ -101,3 +101,13 @@ pip install nose flake8
 nosetests
 flake8
 ```
+
+## Uploading to PyPI
+
+```
+pip install twine
+pip install wheel
+
+python setup.py sdist bdist_wheel
+twine upload dist/*
+```
