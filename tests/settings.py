@@ -1,12 +1,19 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': ':memory:',
+import os
+import json
+
+if "DB_SETTINGS" in os.environ:
+    _db_settings = json.loads(os.environ["DB_SETTINGS"])
+else:
+    # sqlite3 by default (must be sqlite3 >= 3.8.3 supporting WITH clause)
+    _db_settings = {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": ":memory:",
     }
-}
+
+DATABASES = {'default': _db_settings}
 
 INSTALLED_APPS = ["tests"]
 
