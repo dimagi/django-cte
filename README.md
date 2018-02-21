@@ -104,9 +104,17 @@ flake8
 
 ## Uploading to PyPI
 
+Optional: install `pandoc` for prettier README on PyPI. Use your preferred
+package manager to do this. Then install `pypandoc`.
+
 ```
-pip install twine
-pip install wheel
+pip install pypandoc
+```
+
+Finally package and upload the generated files.
+
+```
+pip install twine wheel
 
 python setup.py sdist bdist_wheel
 twine upload dist/*
