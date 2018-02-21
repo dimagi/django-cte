@@ -96,7 +96,8 @@ region.
 ```
 cd django-cte
 mkvirtualenv cte  # or however you choose to setup your environment
-pip install nose
+pip install nose flake8
 
 nosetests
+flake8
 ```
