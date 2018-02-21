@@ -9,7 +9,6 @@ env:
   global:
     - DB_SETTINGS='{"ENGINE":"django.db.backends.postgresql_psycopg2","NAME":"django_cte","USER":"postgres","PASSWORD":"","HOST":"localhost","PORT":""}'
   matrix:
-    - REQ="Django>=1.10,<1.11"
     - REQ="Django>=1.11,<2.0"
     - REQ="Django>=2.0,<2.1"
     - REQ="https://github.com/django/django/archive/master.zip#egg=Django"
