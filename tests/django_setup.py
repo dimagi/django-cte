@@ -13,10 +13,7 @@ def init_db():
     if is_initialized:
         return
     is_initialized = True
-
     connection.creation.create_test_db(verbosity=0)
-    assert connection.is_in_memory_db(), connection
-
     setup_data()
 
 
