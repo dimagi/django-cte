@@ -9,7 +9,7 @@ import django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "tests.settings")
 django.setup()
 
-from .django_setup import init_db, destroy_db
+from .django_setup import init_db, destroy_db  # noqa
 
 
 def setup():

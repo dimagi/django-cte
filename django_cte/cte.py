@@ -93,15 +93,17 @@ class With(object):
         return CTEQuerySet(model, query)
 
     def _add_to_query(self, query):
-        tables = query.tables if django.VERSION < (2, 0) else query.extra_tables
+        django1 = django.VERSION < (2, 0)
+        tables = query.tables if django1 else query.extra_tables
         if not tables:
             # prevent CTE becoming the initial alias
             query.get_initial_alias()
         name = self.name
         if name in tables:
-            raise ValueError("cannot add CTE with name '%s' because "
-                "an entity with that name is already referenced in this "
-                "query's FROM clause" % name)
+            raise ValueError(
+                "cannot add CTE with name '%s' because an entity with that "
+                "name is already referenced in this query's FROM clause" % name
+            )
         query.extra_tables += (name,)
 
     def _resolve_ref(self, name):

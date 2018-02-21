@@ -96,10 +96,10 @@ region.
 ```
 cd django-cte
 mkvirtualenv cte  # or however you choose to setup your environment
-pip install nose flake8
+pip install django nose flake8
 
 nosetests
-flake8
+flake8 --config=setup.cfg
 ```
 
 ## Uploading to PyPI

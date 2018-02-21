@@ -44,10 +44,14 @@ class CTEMeta(Options):
             assert not query.select, query.select
             fields.extend(opts.concrete_fields)
         else:
-            fields.extend(CTEField(cte, col.target.column, col.output_field)
-                for col in query.select)
-        fields.extend(CTEField(cte, alias, annotation.output_field)
-            for alias, annotation in query.annotation_select.items())
+            fields.extend(
+                CTEField(cte, col.target.column, col.output_field)
+                for col in query.select
+            )
+        fields.extend(
+            CTEField(cte, alias, annotation.output_field)
+            for alias, annotation in query.annotation_select.items()
+        )
         return fields
 
     @local_fields.setter

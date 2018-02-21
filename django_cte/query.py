@@ -55,20 +55,10 @@ class CTEQuery(Query):
 
     if django.VERSION < (2, 0):
         def clone(self, klass=None, *args, **kwargs):
-            """ Overrides Django's Query clone in order to return appropriate CTE
-                compiler based on the target Query class. This mechanism is used by
-                methods such as 'update' and '_update' in order to generate UPDATE
-                queries rather than SELECT queries.
-            """
             return self.__chain("clone", klass, *args, **kwargs)
 
     else:
         def chain(self, klass=None):
-            """ Overrides Django's Query clone in order to return appropriate CTE
-                compiler based on the target Query class. This mechanism is used by
-                methods such as 'update' and '_update' in order to generate UPDATE
-                queries rather than SELECT queries.
-            """
             return self.__chain("chain", klass)
 
 
@@ -158,7 +148,8 @@ class CTEAggregateQueryCompiler(SQLAggregateCompiler):
 
     def as_sql(self, *args, **kwargs):
         def _as_sql():
-            return super(CTEAggregateQueryCompiler, self).as_sql(*args, **kwargs)
+            cls = CTEAggregateQueryCompiler
+            return super(cls, self).as_sql(*args, **kwargs)
         return CTECompiler.generate_sql(self.connection, self.query, _as_sql)
 
 
