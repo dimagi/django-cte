@@ -23,5 +23,6 @@ matrix:
 services:
 - postgresql
 install:
-- pip install "$REQ" psycopg2 nose flake8
+- pip install --upgrade pip wheel
+- pip install "$REQ" psycopg2-binary nose flake8
 script: nosetests -v && flake8 django_cte/ tests/
