@@ -1,9 +1,11 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+from unittest import SkipTest
+
 from django.db.models import IntegerField, TextField
 from django.db.models.aggregates import Sum
-from django.db.models.expressions import F, OuterRef, Subquery, Value
+from django.db.models.expressions import Exists, F, OuterRef, Subquery, Value
 from django.db.models.functions import Concat
 from django.test import TestCase
 
@@ -115,3 +117,75 @@ class TestCTE(TestCase):
             ('sun', 368),
             ('venus', None)
         ])
+
+    def test_update_cte_query(self):
+        cte = With(
+            Order.objects
+            .values(region_parent=F("region__parent_id"))
+            .annotate(total=Sum("amount"))
+            .filter(total__isnull=False)
+        )
+        # not the most efficient query, but it exercises CTEUpdateQuery
+        Order.objects.all().with_cte(cte).annotate(
+            cte_has_order=Exists(
+                cte.queryset()
+                .values("total")
+                .filter(region_parent=OuterRef("region_id"))
+            )
+        ).filter(cte_has_order=True).update(amount=Subquery(
+            cte.queryset()
+            .filter(region_parent=OuterRef("region_id"))
+            .values("total")
+        ))
+
+        data = set((o.region_id, o.amount) for o in Order.objects.filter(
+            region_id__in=["earth", "sun", "proxima centauri", "mars"]
+        ))
+        self.assertEqual(data, {
+            ('earth', 6),
+            ('mars', 40),
+            ('mars', 41),
+            ('mars', 42),
+            ('proxima centauri', 33),
+            ('sun', 368),
+        })
+
+    def test_delete_cte_query(self):
+        raise SkipTest(
+            "this test will not work until `QuerySet.delete` (Django method) "
+            "calls `self.query.chain(sql.DeleteQuery)` instead of "
+            "`sql.DeleteQuery(self.model)`"
+        )
+        cte = With(
+            Order.objects
+            .values(region_parent=F("region__parent_id"))
+            .annotate(total=Sum("amount"))
+            .filter(total__isnull=False)
+        )
+        Order.objects.all().with_cte(cte).annotate(
+            cte_has_order=Exists(
+                cte.queryset()
+                .values("total")
+                .filter(region_parent=OuterRef("region_id"))
+            )
+        ).filter(cte_has_order=False).delete()
+
+        data = [(o.region_id, o.amount) for o in Order.objects.all()]
+        self.assertEqual(data, [
+            ('sun', 1000),
+            ('earth', 30),
+            ('earth', 31),
+            ('earth', 32),
+            ('earth', 33),
+            ('proxima centauri', 2000),
+        ])
+
+    def test_insert_cte_query(self):
+        raise SkipTest(
+            "This test not implemented because `Query.bulk_create` calls "
+            "`sql.InsertQuery(self.model)` rather than "
+            "`self.query.chain(sql.InsertQuery)` to create the insert query. "
+        )
+        # additionally `QuerySet.bulk_create` seems to ignore any filters,
+        # annotations, etc., so it appears there is no way to construct an
+        # insert query that uses a CTE

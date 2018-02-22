@@ -3,11 +3,10 @@ from __future__ import unicode_literals
 
 import django
 from django.db import connections
-from django.db.models.sql import (
-    AggregateQuery, DeleteQuery, InsertQuery, Query, UpdateQuery,
-)
+from django.db.models.sql import DeleteQuery, Query, UpdateQuery
 from django.db.models.sql.compiler import (
-    SQLAggregateCompiler, SQLCompiler, SQLDeleteCompiler, SQLInsertCompiler,
+    SQLCompiler,
+    SQLDeleteCompiler,
     SQLUpdateCompiler,
 )
 
@@ -92,23 +91,13 @@ class CTEUpdateQuery(UpdateQuery, CTEQuery):
     pass
 
 
-class CTEInsertQuery(InsertQuery, CTEQuery):
-    pass
-
-
 class CTEDeleteQuery(DeleteQuery, CTEQuery):
-    pass
-
-
-class CTEAggregateQuery(AggregateQuery, CTEQuery):
     pass
 
 
 QUERY_TYPES = {
     UpdateQuery: CTEUpdateQuery,
-    InsertQuery: CTEInsertQuery,
     DeleteQuery: CTEDeleteQuery,
-    AggregateQuery: CTEAggregateQuery,
 }
 
 
@@ -128,15 +117,12 @@ class CTEUpdateQueryCompiler(SQLUpdateCompiler):
         return CTECompiler.generate_sql(self.connection, self.query, _as_sql)
 
 
-class CTEInsertQueryCompiler(SQLInsertCompiler):
-
-    def as_sql(self, *args, **kwargs):
-        def _as_sql():
-            return super(CTEInsertQueryCompiler, self).as_sql(*args, **kwargs)
-        return CTECompiler.generate_sql(self.connection, self.query, _as_sql)
-
-
 class CTEDeleteQueryCompiler(SQLDeleteCompiler):
+
+    # NOTE: it is currently not possible to execute delete queries that
+    # reference CTEs without patching `QuerySet.delete` (Django method)
+    # to call `self.query.chain(sql.DeleteQuery)` instead of
+    # `sql.DeleteQuery(self.model)`
 
     def as_sql(self, *args, **kwargs):
         def _as_sql():
@@ -144,18 +130,7 @@ class CTEDeleteQueryCompiler(SQLDeleteCompiler):
         return CTECompiler.generate_sql(self.connection, self.query, _as_sql)
 
 
-class CTEAggregateQueryCompiler(SQLAggregateCompiler):
-
-    def as_sql(self, *args, **kwargs):
-        def _as_sql():
-            cls = CTEAggregateQueryCompiler
-            return super(cls, self).as_sql(*args, **kwargs)
-        return CTECompiler.generate_sql(self.connection, self.query, _as_sql)
-
-
 COMPILER_TYPES = {
     CTEUpdateQuery: CTEUpdateQueryCompiler,
-    CTEInsertQuery: CTEInsertQueryCompiler,
     CTEDeleteQuery: CTEDeleteQueryCompiler,
-    CTEAggregateQuery: CTEAggregateQueryCompiler,
 }
