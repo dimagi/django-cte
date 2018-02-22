@@ -5,8 +5,7 @@ from unittest import SkipTest
 
 from django.db.models import IntegerField, TextField
 from django.db.models.aggregates import Sum
-from django.db.models.expressions import Exists, F, OuterRef, Subquery, Value
-from django.db.models.functions import Concat
+from django.db.models.expressions import Exists, F, OuterRef, Subquery
 from django.test import TestCase
 
 from django_cte import With
@@ -50,38 +49,6 @@ class TestCTE(TestCase):
             (40, 'mars', 123),
             (41, 'mars', 123),
             (42, 'mars', 123),
-        ])
-
-    def test_recursive_cte_query(self):
-        def make_regions_cte(cte):
-            return Region.objects.filter(
-                parent__isnull=True
-            ).values(
-                "name",
-                path=F("name"),
-                depth=Value(0, output_field=int_field),
-            ).union(
-                cte.join(Region, parent=cte.col.name).values(
-                    "name",
-                    path=Concat(
-                        cte.col.path, Value("\x01"), F("name"),
-                        output_field=text_field,
-                    ),
-                    depth=cte.col.depth + Value(1, output_field=int_field),
-                ),
-                all=True,
-            )
-        cte = With.recursive(make_regions_cte)
-        regions = cte.join(Region, name=cte.col.name).with_cte(cte).annotate(
-            path=cte.col.path,
-            depth=cte.col.depth,
-        ).filter(depth=2).order_by("path")
-
-        data = [(r.name, r.path.split("\x01"), r.depth) for r in regions]
-        self.assertEqual(data, [
-            ('moon', ['sun', 'earth', 'moon'], 2),
-            ('deimos', ['sun', 'mars', 'deimos'], 2),
-            ('phobos', ['sun', 'mars', 'phobos'], 2),
         ])
 
     def test_cte_queryset(self):
