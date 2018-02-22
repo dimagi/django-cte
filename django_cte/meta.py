@@ -95,7 +95,10 @@ class CTERef(object):
                 "Hint: use ExpressionWrapper({cte}.col.{name}, "
                 "output_field=...)".format(cte=self._cte.name, name=self.name)
             )
-        return self._cte._resolve_ref(self.name)
+        ref = self._cte._resolve_ref(self.name)
+        if ref is self or self in ref.get_source_expressions():
+            raise ValueError("Circular reference: {} = {}".format(self, ref))
+        return ref
 
     @property
     def target(self):

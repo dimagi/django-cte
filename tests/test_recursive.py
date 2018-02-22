@@ -80,3 +80,15 @@ class TestRecursiveCTE(TestCase):
         # SELECT COUNT(*)
         # FROM "tests_region", "cte"
         # WHERE "tests_region"."name" = ("cte"."name")
+
+    def test_circular_ref_error(self):
+        def make_bad_cte(cte):
+            # NOTE: not a valid recursive CTE query
+            return cte.join(Region, parent=cte.col.name).values(
+                depth=cte.col.depth + 1,
+            )
+        cte = With.recursive(make_bad_cte)
+        regions = cte.join(Region, name=cte.col.name).with_cte(cte)
+        with self.assertRaises(ValueError) as context:
+            print(regions.query)
+        self.assertIn("Circular reference:", str(context.exception))
