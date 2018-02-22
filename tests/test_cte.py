@@ -126,13 +126,11 @@ class TestCTE(TestCase):
             .filter(total__isnull=False)
         )
         # not the most efficient query, but it exercises CTEUpdateQuery
-        Order.objects.all().with_cte(cte).annotate(
-            cte_has_order=Exists(
-                cte.queryset()
-                .values("total")
-                .filter(region_parent=OuterRef("region_id"))
-            )
-        ).filter(cte_has_order=True).update(amount=Subquery(
+        Order.objects.all().with_cte(cte).filter(region_id__in=Subquery(
+            cte.queryset()
+            .filter(region_parent=OuterRef("region_id"))
+            .values("region_parent")
+        )).update(amount=Subquery(
             cte.queryset()
             .filter(region_parent=OuterRef("region_id"))
             .values("total")
