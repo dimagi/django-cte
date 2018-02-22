@@ -144,13 +144,3 @@ class TestCTE(TestCase):
             ('earth', 33),
             ('proxima centauri', 2000),
         ])
-
-    def test_insert_cte_query(self):
-        raise SkipTest(
-            "This test not implemented because `Query.bulk_create` calls "
-            "`sql.InsertQuery(self.model)` rather than "
-            "`self.query.chain(sql.InsertQuery)` to create the insert query. "
-        )
-        # additionally `QuerySet.bulk_create` seems to ignore any filters,
-        # annotations, etc., so it appears there is no way to construct an
-        # insert query that uses a CTE
