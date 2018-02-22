@@ -5,7 +5,14 @@ from __future__ import unicode_literals
 from unittest import SkipTest
 
 from django.db.models import IntegerField, TextField
-from django.db.models.expressions import F, Value
+from django.db.models.expressions import (
+    Case,
+    ExpressionWrapper,
+    F,
+    Q,
+    Value,
+    When,
+)
 from django.db.models.functions import Concat
 from django.db.utils import DatabaseError
 from django.test import TestCase
@@ -50,6 +57,66 @@ class TestRecursiveCTE(TestCase):
             ('moon', ['sun', 'earth', 'moon'], 2),
             ('deimos', ['sun', 'mars', 'deimos'], 2),
             ('phobos', ['sun', 'mars', 'phobos'], 2),
+        ])
+
+    def test_recursive_cte_reference_in_condition(self):
+        def make_regions_cte(cte):
+            return Region.objects.filter(
+                parent__isnull=True
+            ).values(
+                "name",
+                path=F("name"),
+                depth=Value(0, output_field=int_field),
+                is_planet=Value(0, output_field=int_field),
+            ).union(
+                cte.join(
+                    Region, parent=cte.col.name
+                ).annotate(
+                    # annotations for filter and CASE/WHEN conditions
+                    parent_name=ExpressionWrapper(
+                        cte.col.name,
+                        output_field=text_field,
+                    ),
+                    parent_depth=ExpressionWrapper(
+                        cte.col.depth,
+                        output_field=int_field,
+                    ),
+                ).filter(
+                    ~Q(parent_name="mars"),
+                ).values(
+                    "name",
+                    path=Concat(
+                        cte.col.path, Value("\x01"), F("name"),
+                        output_field=text_field,
+                    ),
+                    depth=cte.col.depth + Value(1, output_field=int_field),
+                    is_planet=Case(
+                        When(parent_depth=0, then=Value(1)),
+                        default=Value(0),
+                        output_field=int_field,
+                    ),
+                ),
+                all=True,
+            )
+        cte = With.recursive(make_regions_cte)
+        regions = cte.join(Region, name=cte.col.name).with_cte(cte).annotate(
+            path=cte.col.path,
+            depth=cte.col.depth,
+            is_planet=cte.col.is_planet,
+        ).order_by("path")
+
+        data = [(r.path.split("\x01"), r.is_planet) for r in regions]
+        print(data)
+        self.assertEqual(data, [
+            (["bernard's star"], 0),
+            (['proxima centauri'], 0),
+            (['proxima centauri', 'proxima centauri b'], 1),
+            (['sun'], 0),
+            (['sun', 'earth'], 1),
+            (['sun', 'earth', 'moon'], 0),
+            (['sun', 'mars'], 1),  # mars moons excluded: parent_name != 'mars'
+            (['sun', 'mercury'], 1),
+            (['sun', 'venus'], 1),
         ])
 
     def test_recursive_cte_with_empty_union_part(self):
