@@ -159,6 +159,78 @@ class TestCTE(TestCase):
             ('venus', 4, 86),
         ])
 
+    def test_cte_union(self):
+        summaries = With(
+            Order.objects
+            .filter(region__parent="sun")
+            .values("region_id")
+            .annotate(
+                sum_name=Concat(F("region_id"), Value(" summary")),
+                sum_value=Sum("amount"),
+            )
+        )
+
+        # this works
+        amounts = (
+            summaries.queryset().with_cte(summaries).values(
+                name=F("sum_name"),
+                amount=F("sum_value"),
+            )
+            .union(
+                Order.objects
+                .filter(region__parent="sun")
+                .annotate(
+                    name=F("region_id"),
+                )
+                .values("name", "amount"),
+                all=True,
+            )
+            .order_by("name")
+        )
+
+        # this fails (invalid SQL)
+        amounts = (
+            Order.objects
+            .filter(region__parent="sun")
+            .with_cte(summaries)
+            .annotate(
+                name=F("region_id"),
+            )
+            .values("name", "amount")
+            # Django query/union bug?
+            # query.values_select == ["amount"] should be ["name", "amount"]
+            .union(
+                summaries.queryset().values(
+                    name=F("sum_name"),
+                    amount=F("sum_value"),
+                ),
+                all=True,
+            )
+            .order_by("name")
+        )
+        print(amounts.query)
+
+        self.assertEqual(list(amounts), [
+            {'name': 'earth', 'amount': 30},
+            {'name': 'earth', 'amount': 31},
+            {'name': 'earth', 'amount': 32},
+            {'name': 'earth', 'amount': 33},
+            {'name': 'earth summary', 'amount': 126},
+            {'name': 'mars', 'amount': 40},
+            {'name': 'mars', 'amount': 41},
+            {'name': 'mars', 'amount': 42},
+            {'name': 'mars summary', 'amount': 123},
+            {'name': 'mercury', 'amount': 10},
+            {'name': 'mercury', 'amount': 11},
+            {'name': 'mercury', 'amount': 12},
+            {'name': 'mercury summary', 'amount': 33},
+            {'name': 'venus', 'amount': 20},
+            {'name': 'venus', 'amount': 21},
+            {'name': 'venus', 'amount': 22},
+            {'name': 'venus', 'amount': 23},
+            {'name': 'venus summary', 'amount': 86},
+        ])
+
     def test_update_cte_query(self):
         cte = With(
             Order.objects
