@@ -4,8 +4,9 @@ from __future__ import unicode_literals
 from unittest import SkipTest
 
 from django.db.models import IntegerField, TextField
-from django.db.models.aggregates import Sum
-from django.db.models.expressions import Exists, F, OuterRef, Subquery
+from django.db.models.aggregates import Count, Sum
+from django.db.models.expressions import Exists, F, OuterRef, Subquery, Value
+from django.db.models.functions import Concat
 from django.test import TestCase
 
 from django_cte import With
@@ -83,6 +84,79 @@ class TestCTE(TestCase):
             ('proxima centauri b', None),
             ('sun', 368),
             ('venus', None)
+        ])
+
+    def test_named_ctes(self):
+        def make_paths_cte(paths):
+            return Region.objects.filter(
+                parent__isnull=True
+            ).values(
+                "name",
+                path=F("name"),
+            ).union(
+                paths.join(Region, parent=paths.col.name).values(
+                    "name",
+                    path=Concat(
+                        paths.col.path, Value(" "), F("name"),
+                        output_field=text_field,
+                    ),
+                ),
+                all=True,
+            )
+        paths = With.recursive(make_paths_cte, name="region_paths")
+
+        def make_groups_cte(groups):
+            return paths.join(Region, name=paths.col.name).values(
+                "name",
+                parent_path=paths.col.path,
+                parent_name=F("name"),
+            ).union(
+                groups.join(Region, parent=groups.col.name).values(
+                    "name",
+                    parent_path=groups.col.parent_path,
+                    parent_name=groups.col.parent_name,
+                ),
+                all=True,
+            )
+        groups = With.recursive(make_groups_cte, name="region_groups")
+
+        region_totals = With(
+            groups.join(Order, region_id=groups.col.name)
+            .values(
+                name=groups.col.parent_name,
+                path=groups.col.parent_path,
+            ).annotate(
+                orders_count=Count("id"),
+                region_total=Sum("amount"),
+            ),
+            name="region_totals",
+        )
+
+        regions = (
+            region_totals.join(Region, name=region_totals.col.name)
+            .with_cte(paths)
+            .with_cte(groups)
+            .with_cte(region_totals)
+            .annotate(
+                path=region_totals.col.path,
+                # count of orders in this region and all subregions
+                orders_count=region_totals.col.orders_count,
+                # sum of order amounts in this region and all subregions
+                region_total=region_totals.col.region_total,
+            )
+            .order_by("path")
+        )
+
+        data = [(r.name, r.orders_count, r.region_total) for r in regions]
+        self.assertEqual(data, [
+            ('proxima centauri', 4, 2033),
+            ('proxima centauri b', 3, 33),
+            ('sun', 18, 1374),
+            ('earth', 7, 132),
+            ('moon', 3, 6),
+            ('mars', 3, 123),
+            ('mercury', 3, 33),
+            ('venus', 4, 86),
         ])
 
     def test_update_cte_query(self):
