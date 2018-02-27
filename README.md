@@ -90,7 +90,7 @@ results will be ordered by `path` (hierarchically by region name). In this case
 `path` is a `'\x01'`-delimited string of region names starting with the root
 region.
 
-See tests for more advanced examples.
+See [tests](./tests) for more advanced examples.
 
 
 ## Running tests
