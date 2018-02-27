@@ -42,7 +42,7 @@ class TestRecursiveCTE(TestCase):
                         cte.col.path, Value("\x01"), F("name"),
                         output_field=text_field,
                     ),
-                    depth=cte.col.depth + 1,
+                    depth=cte.col.depth + Value(1, output_field=int_field),
                 ),
                 all=True,
             )
@@ -89,7 +89,7 @@ class TestRecursiveCTE(TestCase):
                         cte.col.path, Value("\x01"), F("name"),
                         output_field=text_field,
                     ),
-                    depth=cte.col.depth + 1,
+                    depth=cte.col.depth + Value(1, output_field=int_field),
                     is_planet=Case(
                         When(parent_depth=0, then=Value(1)),
                         default=Value(0),

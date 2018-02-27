@@ -67,7 +67,7 @@ def make_regions_cte(cte):
                 cte.col.path, Value("\x01"), F("name"),
                 output_field=TextField(),
             ),
-            depth=cte.col.depth + 1,
+            depth=cte.col.depth + Value(1, output_field=IntegerField()),
         ),
         all=True,
     )
