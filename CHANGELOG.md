@@ -1,5 +1,9 @@
 # Django CTE change log
 
+## v0.1.3 - 2018-03-15
+
+- Add `django_cte.raw.raw_cte_sql` for constructing CTEs with raw SQL.
+
 ## v0.1.2 - 2018-02-21
 
 - Improve error on bad recursive reference.
