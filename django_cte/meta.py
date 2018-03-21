@@ -145,4 +145,8 @@ class CTEField(CTERef):
         return self.name
 
     def __getattr__(self, name):
+        if name == "attname":
+            # Do not allow column reference by concrete column name.
+            # Prevents concrete name masking other CTE column alias.
+            raise AttributeError("attname")
         return getattr(self.output_field, name)

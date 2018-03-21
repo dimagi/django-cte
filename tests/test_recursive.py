@@ -7,8 +7,10 @@ from unittest import SkipTest
 from django.db.models import IntegerField, TextField
 from django.db.models.expressions import (
     Case,
+    Exists,
     ExpressionWrapper,
     F,
+    OuterRef,
     Q,
     Value,
     When,
@@ -159,3 +161,34 @@ class TestRecursiveCTE(TestCase):
         with self.assertRaises(ValueError) as context:
             print(regions.query)
         self.assertIn("Circular reference:", str(context.exception))
+
+    def test_attname_should_not_mask_col_name(self):
+        def make_regions_cte(cte):
+            return Region.objects.filter(
+                name="moon"
+            ).values(
+                "name",
+                "parent_id",
+            ).union(
+                cte.join(Region, name=cte.col.parent_id).values(
+                    "name",
+                    "parent_id",
+                ),
+                all=True,
+            )
+        cte = With.recursive(make_regions_cte)
+        regions = (
+            Region.objects.all()
+            .with_cte(cte)
+            .annotate(_ex=Exists(
+                cte.queryset()
+                .values(value=Value("1", output_field=int_field))
+                .filter(name=OuterRef("name"))
+            ))
+            .filter(_ex=True)
+            .order_by("name")
+        )
+        print(regions.query)
+
+        data = [r.name for r in regions]
+        self.assertEqual(data, ['earth', 'moon', 'sun'])
