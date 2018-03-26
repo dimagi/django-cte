@@ -2,13 +2,39 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import django
-from django.db.models import Manager
+from django.db.models import Manager, ExpressionWrapper, Q
 from django.db.models.query import QuerySet
+from django.db.models.sql.constants import INNER
+from django.db.models.sql.datastructures import Join
 
 from .meta import CTEColumns, CTEModel
 from .query import CTEQuery
 
 __all__ = ["With", "CTEManager", "CTEQuerySet"]
+
+
+class FakeForeignObject(object):
+    """Class used to add a join to a query without a 'real' relation.
+
+    :param: join_cols: A list of two-tuples (parent_col, table_col) to join on.
+    """
+    def __init__(self, query, *filter_q, **filter_kw):
+        self.query = query
+        self.filter_q = filter_q
+        self.filter_kw = filter_kw
+
+    def get_joining_columns(self):
+        return []
+
+    def get_extra_restriction(self, *args, **kwargs):
+        return Q(
+            *self.filter_q,
+            Q(**self.filter_kw),
+        ).resolve_expression(
+            self.query,
+            True,
+            self.query.used_aliases,
+        )
 
 
 class With(object):
@@ -70,6 +96,22 @@ class With(object):
         query = queryset.query
         self._add_to_query(query)
         return queryset.filter(*filter_q, **filter_kw)
+
+    def real_join(self, model_or_queryset, join_type=INNER, nullable=False, *filter_q, **filter_kw):
+        if isinstance(model_or_queryset, QuerySet):
+            queryset = model_or_queryset.all()
+        else:
+            queryset = model_or_queryset.objects.all()
+        query = queryset.query
+
+        for kwarg in filter_kw:
+            query.resolve_ref(kwarg)
+
+        relation = FakeForeignObject(query, *filter_q, **filter_kw)
+        join = Join(self.name, query.get_initial_alias(), self.name, join_type, relation, nullable)
+        query.join(join)
+
+        return queryset
 
     def queryset(self, model=None):
         """Get a queryset selecting from this CTE
