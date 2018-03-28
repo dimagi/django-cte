@@ -2,7 +2,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import django
-from django.db.models import Manager, ExpressionWrapper, Q
+from django.db.models import Manager, Q
 from django.db.models.query import QuerySet
 from django.db.models.sql.constants import INNER
 from django.db.models.sql.datastructures import Join
@@ -97,7 +97,14 @@ class With(object):
         self._add_to_query(query)
         return queryset.filter(*filter_q, **filter_kw)
 
-    def real_join(self, model_or_queryset, join_type=INNER, nullable=False, *filter_q, **filter_kw):
+    def real_join(
+        self,
+        model_or_queryset,
+        join_type=INNER,
+        nullable=False,
+        *filter_q,
+        **filter_kw,
+    ):
         if isinstance(model_or_queryset, QuerySet):
             queryset = model_or_queryset.all()
         else:
@@ -108,7 +115,14 @@ class With(object):
             query.resolve_ref(kwarg)
 
         relation = FakeForeignObject(query, *filter_q, **filter_kw)
-        join = Join(self.name, query.get_initial_alias(), self.name, join_type, relation, nullable)
+        join = Join(
+            self.name,
+            query.get_initial_alias(),
+            self.name,
+            join_type,
+            relation,
+            nullable,
+        )
         query.join(join)
 
         return queryset
