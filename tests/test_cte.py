@@ -28,7 +28,7 @@ class TestCTE(TestCase):
         )
         orders = (
             totals
-            .join(Order, region=totals.col.region_id)
+            .real_join(Order, region=totals.col.region_id)
             .with_cte(totals)
             .annotate(region_total=totals.col.total)
             .order_by("amount")
@@ -94,7 +94,7 @@ class TestCTE(TestCase):
                 "name",
                 path=F("name"),
             ).union(
-                paths.join(Region, parent=paths.col.name).values(
+                paths.real_join(Region, parent=paths.col.name).values(
                     "name",
                     path=Concat(
                         paths.col.path, Value(" "), F("name"),
@@ -106,12 +106,12 @@ class TestCTE(TestCase):
         paths = With.recursive(make_paths_cte, name="region_paths")
 
         def make_groups_cte(groups):
-            return paths.join(Region, name=paths.col.name).values(
+            return paths.real_join(Region, name=paths.col.name).values(
                 "name",
                 parent_path=paths.col.path,
                 parent_name=F("name"),
             ).union(
-                groups.join(Region, parent=groups.col.name).values(
+                groups.real_join(Region, parent=groups.col.name).values(
                     "name",
                     parent_path=groups.col.parent_path,
                     parent_name=groups.col.parent_name,
@@ -121,7 +121,7 @@ class TestCTE(TestCase):
         groups = With.recursive(make_groups_cte, name="region_groups")
 
         region_totals = With(
-            groups.join(Order, region_id=groups.col.name)
+            groups.real_join(Order, region_id=groups.col.name)
             .values(
                 name=groups.col.parent_name,
                 path=groups.col.parent_path,
@@ -133,7 +133,7 @@ class TestCTE(TestCase):
         )
 
         regions = (
-            region_totals.join(Region, name=region_totals.col.name)
+            region_totals.real_join(Region, name=region_totals.col.name)
             .with_cte(paths)
             .with_cte(groups)
             .with_cte(region_totals)
