@@ -6,6 +6,7 @@
   argument.
 - Improve `With.queryset()` to allow selecting directly from the CTE rather than
   joining to a model.
+- Refactor `With.join()` to use real JOIN clause.
 
 ## v0.1.4 - 2018-03-21
 

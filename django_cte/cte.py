@@ -1,11 +1,11 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-import django
 from django.db.models import Manager
-from django.db.models.query import QuerySet
+from django.db.models.query import Q, QuerySet
 from django.db.models.sql.datastructures import BaseTable
 
+from .join import QJoin, INNER
 from .meta import CTEColumnRef, CTEColumns
 from .query import CTEQuery
 
@@ -68,9 +68,19 @@ class With(object):
             queryset = model_or_queryset.all()
         else:
             queryset = model_or_queryset.objects.all()
+        join_type = filter_kw.pop("_join_type", INNER)
         query = queryset.query
-        self._add_to_query(query)
-        return queryset.filter(*filter_q, **filter_kw)
+
+        # based on Query.add_q: add necessary joins to query, but no filter
+        q_object = Q(*filter_q, **filter_kw)
+        map = query.alias_map
+        existing_inner = set(a for a in map if map[a].join_type == INNER)
+        on_clause, _ = query._add_q(q_object, query.used_aliases)
+        query.demote_joins(existing_inner)
+
+        parent = query.get_initial_alias()
+        query.join(QJoin(parent, self.name, self.name, on_clause, join_type))
+        return queryset
 
     def queryset(self):
         """Get a queryset selecting from this CTE
@@ -106,20 +116,6 @@ class With(object):
         qs._iterable_class = cte_qs._iterable_class
         qs._fields = cte_qs._fields
         return qs
-
-    def _add_to_query(self, query):
-        django1 = django.VERSION < (2, 0)
-        tables = query.tables if django1 else query.extra_tables
-        if not tables:
-            # prevent CTE becoming the initial alias
-            query.get_initial_alias()
-        name = self.name
-        if name in tables:
-            raise ValueError(
-                "cannot add CTE with name '%s' because an entity with that "
-                "name is already referenced in this query's FROM clause" % name
-            )
-        query.extra_tables += (name,)
 
     def _resolve_ref(self, name):
         return self._queryset.query.resolve_ref(name)

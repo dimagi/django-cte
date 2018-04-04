@@ -220,6 +220,7 @@ class TestCTE(TestCase):
             )
             .order_by("path")
         )
+        print(regions.query)
 
         data = [(r.name, r.orders_count, r.region_total) for r in regions]
         self.assertEqual(data, [
