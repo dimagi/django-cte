@@ -65,11 +65,13 @@ class TestCTE(TestCase):
                 child_regions_total=Subquery(
                     sub_totals.queryset()
                     .filter(region_parent=OuterRef("name"))
-                    .values("total")
+                    .values("total"),
+                    output_field=int_field  # needed for Django 1.11, not 2.x
                 ),
             )
             .order_by("name")
         )
+        print(regions.query)
 
         data = [(r.name, r.child_regions_total) for r in regions]
         self.assertEqual(data, [
@@ -84,6 +86,78 @@ class TestCTE(TestCase):
             ('proxima centauri b', None),
             ('sun', 368),
             ('venus', None)
+        ])
+
+    def test_cte_queryset_with_model_result(self):
+        cte = With(
+            Order.objects
+            .annotate(region_parent=F("region__parent_id")),
+        )
+        orders = cte.queryset().with_cte(cte).order_by("region_id", "amount")
+        print(orders.query)
+
+        data = [(x.region_id, x.amount, x.region_parent) for x in orders][:5]
+        self.assertEqual(data, [
+            ("earth", 30, "sun"),
+            ("earth", 31, "sun"),
+            ("earth", 32, "sun"),
+            ("earth", 33, "sun"),
+            ("mars", 40, "sun"),
+        ])
+        self.assertTrue(
+            all(isinstance(x, Order) for x in orders),
+            repr([x for x in orders]),
+        )
+
+    def test_cte_queryset_with_join(self):
+        cte = With(
+            Order.objects
+            .annotate(region_parent=F("region__parent_id")),
+        )
+        orders = (
+            cte.queryset()
+            .with_cte(cte)
+            .annotate(parent=F("region__parent_id"))
+            .order_by("region_id", "amount")
+        )
+        print(orders.query)
+
+        data = [(x.region_id, x.region_parent, x.parent) for x in orders][:5]
+        self.assertEqual(data, [
+            ("earth", "sun", "sun"),
+            ("earth", "sun", "sun"),
+            ("earth", "sun", "sun"),
+            ("earth", "sun", "sun"),
+            ("mars", "sun", "sun"),
+        ])
+
+    def test_cte_queryset_with_values_result(self):
+        cte = With(
+            Order.objects
+            .values(
+                "region_id",
+                region_parent=F("region__parent_id"),
+            )
+            .distinct()
+        )
+        values = (
+            cte.queryset()
+            .with_cte(cte)
+            .filter(region_parent__isnull=False)
+            .order_by("region_parent", "region_id")
+        )
+        print(values.query)
+
+        data = list(values)[:5]
+        self.assertEqual(data, [
+            {'region_id': 'moon', 'region_parent': 'earth'},
+            {
+                'region_id': 'proxima centauri b',
+                'region_parent': 'proxima centauri',
+            },
+            {'region_id': 'earth', 'region_parent': 'sun'},
+            {'region_id': 'mars', 'region_parent': 'sun'},
+            {'region_id': 'mercury', 'region_parent': 'sun'},
         ])
 
     def test_named_ctes(self):

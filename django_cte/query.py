@@ -10,8 +10,6 @@ from django.db.models.sql.compiler import (
     SQLUpdateCompiler,
 )
 
-from .meta import CTEModel
-
 
 class CTEQuery(Query):
     """A Query which processes SQL compilation through the CTE compiler"""
@@ -47,8 +45,6 @@ class CTEQuery(Query):
     def __chain(self, _name, klass=None, *args, **kwargs):
         klass = QUERY_TYPES.get(klass, self.__class__)
         clone = getattr(super(CTEQuery, self), _name)(klass, *args, **kwargs)
-        if isinstance(clone.model, CTEModel):
-            clone.model = clone.model._copy_for_query(clone)
         clone._with_ctes = self._with_ctes[:]
         return clone
 

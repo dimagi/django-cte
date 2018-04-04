@@ -1,5 +1,12 @@
 # Django CTE change log
 
+## v1.0.0 - ?
+
+- BACKWARD INCOMPATIBLE CHANGE: `With.queryset()` no longer accepts a `model`
+  argument.
+- Improve `With.queryset()` to allow selecting directly from the CTE rather than
+  joining to a model.
+
 ## v0.1.4 - 2018-03-21
 
 - Fix related field attname masking CTE column.

@@ -4,64 +4,6 @@ from __future__ import unicode_literals
 import weakref
 
 from django.db.models.expressions import Col, Expression
-from django.db.models.options import Options
-
-
-class CTEModel(object):
-
-    def __init__(self, cte, query):
-        self._meta = CTEMeta(cte, query)
-
-    def _copy_for_query(self, query):
-        return type(self)(self._meta._cte(), query)
-
-
-class CTEMeta(Options):
-
-    def __init__(self, cte, query):
-        super(CTEMeta, self).__init__(None)
-        self.managed = False
-        self.model = None
-        self._cte = weakref.ref(cte)
-        self._query = weakref.ref(query)
-
-    @property
-    def db_table(self):
-        return self._cte().name
-
-    @db_table.setter
-    def db_table(self, value):
-        if value != '':
-            raise AttributeError("CTEMeta.db_table is read-only")
-
-    @property
-    def local_fields(self):
-        cte = self._cte()
-        query = cte._queryset.query
-        opts = query.get_meta()
-        fields = []
-        if query.default_cols:
-            assert not query.select, query.select
-            fields.extend(opts.concrete_fields)
-        else:
-            fields.extend(
-                CTEField(cte, col.target.column, col.output_field)
-                for col in query.select
-            )
-        fields.extend(
-            CTEField(cte, alias, annotation.output_field)
-            for alias, annotation in query.annotation_select.items()
-        )
-        return fields
-
-    @local_fields.setter
-    def local_fields(self, value):
-        if value != []:
-            raise AttributeError("CTEMeta.local_fields is read-only")
-
-    @property
-    def _relation_tree(self):
-        return []
 
 
 class CTEColumns(object):
@@ -73,7 +15,7 @@ class CTEColumns(object):
         return CTEColumn(self._cte(), name)
 
 
-class CTERef(object):
+class CTEColumn(Expression):
 
     def __init__(self, cte, name, output_field=None):
         self._cte = cte
@@ -110,9 +52,6 @@ class CTERef(object):
             return self._output_field
         return self._ref.output_field
 
-
-class CTEColumn(CTERef, Expression):
-
     def as_sql(self, compiler, connection):
         qn = compiler.quote_name_unless_alias
         ref = self._ref
@@ -123,30 +62,26 @@ class CTEColumn(CTERef, Expression):
         return "%s.%s" % (qn(self._cte.name), qn(column)), []
 
 
-class CTEField(CTERef):
+class CTEColumnRef(Expression):
 
-    concrete = False
-    is_relation = False
+    def __init__(self, name, output_field):
+        self.name = name
+        self.output_field = output_field
+        self._alias = None
 
-    def get_col(self, alias, output_field=None):
-        output_field = output_field or self.output_field
-        return Col(alias, self, output_field)
+    def resolve_expression(self, query=None, allow_joins=True, reuse=None,
+                           summarize=False, for_save=False):
+        ref = self.copy()
+        ref._alias = query.get_initial_alias()
+        return ref
 
-    @property
-    def model(self):
-        query = self._cte._queryset.query
-        model = query.model
-        if isinstance(model, CTEModel) and model._meta._cte() is self._cte:
-            return model
-        return CTEModel(self._cte, query)
+    def relabeled_clone(self, relabels):
+        if self._alias is not None and self._alias in relabels:
+            clone = self.copy()
+            clone._alias = relabels[self._alias]
+            return clone
+        return self
 
-    @property
-    def column(self):
-        return self.name
-
-    def __getattr__(self, name):
-        if name == "attname":
-            # Do not allow column reference by concrete column name.
-            # Prevents concrete name masking other CTE column alias.
-            raise AttributeError("attname")
-        return getattr(self.output_field, name)
+    def as_sql(self, compiler, connection):
+        qn = connection.ops.quote_name
+        return "%s.%s" % (self._alias, qn(self.name)), []

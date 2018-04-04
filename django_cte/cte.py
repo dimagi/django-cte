@@ -4,8 +4,9 @@ from __future__ import unicode_literals
 import django
 from django.db.models import Manager
 from django.db.models.query import QuerySet
+from django.db.models.sql.datastructures import BaseTable
 
-from .meta import CTEColumns, CTEModel
+from .meta import CTEColumnRef, CTEColumns
 from .query import CTEQuery
 
 __all__ = ["With", "CTEManager", "CTEQuerySet"]
@@ -71,7 +72,7 @@ class With(object):
         self._add_to_query(query)
         return queryset.filter(*filter_q, **filter_kw)
 
-    def queryset(self, model=None):
+    def queryset(self):
         """Get a queryset selecting from this CTE
 
         This CTE will be refernced by the returned queryset, but the
@@ -79,18 +80,32 @@ class With(object):
         queryset's SQL output; use `<CTEQuerySet>.with_cte(cte)` to
         achieve that outcome.
 
-        :param model: Optional model class to use as the queryset's
-        primary model. If this is provided the CTE will be added to
-        the queryset's table list and join conditions may be added
-        with a subsequent `.filter(...)` call.
         :returns: A queryset.
         """
+        cte_qs = self._queryset
+        cte_query = cte_qs.query
+        model = cte_query.model
+
         query = CTEQuery(model)
-        if model is None:
-            model = query.model = CTEModel(self, query)
-        else:
-            self._add_to_query(query)
-        return CTEQuerySet(model, query)
+        query.join(BaseTable(self.name, None))
+        query.default_cols = cte_query.default_cols
+        if cte_query._annotations:
+            for alias, value in cte_query.annotations.items():
+                col = CTEColumnRef(alias, value.output_field)
+                query.add_annotation(col, alias)
+        if cte_query.values_select:
+            query.set_values(cte_query.values_select)
+        query.annotation_select_mask = cte_query.annotation_select_mask
+
+        qs = CTEQuerySet(
+            model=model,
+            query=query,
+            using=cte_qs._db,
+            hints=cte_qs._hints,
+        )
+        qs._iterable_class = cte_qs._iterable_class
+        qs._fields = cte_qs._fields
+        return qs
 
     def _add_to_query(self, query):
         django1 = django.VERSION < (2, 0)
