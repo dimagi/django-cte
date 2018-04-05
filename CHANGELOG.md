@@ -1,11 +1,11 @@
 # Django CTE change log
 
-## v1.0.0 - ?
+## v1.0.0 - 2018-04-04
 
 - BACKWARD INCOMPATIBLE CHANGE: `With.queryset()` no longer accepts a `model`
   argument.
-- Improve `With.queryset()` to allow selecting directly from the CTE rather than
-  joining to a model.
+- Improve `With.queryset()` to select directly from the CTE rather than
+  joining to anoter QuerySet.
 - Refactor `With.join()` to use real JOIN clause.
 
 ## v0.1.4 - 2018-03-21

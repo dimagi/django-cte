@@ -3,4 +3,4 @@ from __future__ import unicode_literals
 
 from .cte import CTEManager, CTEQuerySet, With  # noqa
 
-__version__ = "0.1.4"
+__version__ = "1.0.0"
