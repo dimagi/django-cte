@@ -160,6 +160,35 @@ class TestCTE(TestCase):
             {'region_id': 'mercury', 'region_parent': 'sun'},
         ])
 
+    def test_cte_queryset_with_custom_queryset(self):
+        cte = With(
+            Order.objects
+            .annotate(region_parent=F("region__parent_id"))
+            .filter(region__parent_id="sun")
+        )
+        orders = (
+            cte.queryset()
+            .with_cte(cte)
+            .lt40()  # custom queryset method
+            .order_by("region_id", "amount")
+        )
+        print(orders.query)
+
+        data = [(x.region_id, x.amount, x.region_parent) for x in orders]
+        self.assertEqual(data, [
+            ("earth", 30, "sun"),
+            ("earth", 31, "sun"),
+            ("earth", 32, "sun"),
+            ("earth", 33, "sun"),
+            ('mercury', 10, 'sun'),
+            ('mercury', 11, 'sun'),
+            ('mercury', 12, 'sun'),
+            ('venus', 20, 'sun'),
+            ('venus', 21, 'sun'),
+            ('venus', 22, 'sun'),
+            ('venus', 23, 'sun'),
+        ])
+
     def test_named_ctes(self):
         def make_paths_cte(paths):
             return Region.objects.filter(

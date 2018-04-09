@@ -10,7 +10,19 @@ from django.db.models import (
     TextField,
 )
 
-from django_cte import CTEManager
+from django_cte import CTEManager, CTEQuerySet
+
+
+class LT40QuerySet(CTEQuerySet):
+
+    def lt40(self):
+        return self.filter(amount__lt=40)
+
+
+class LT40Manager(CTEManager):
+
+    def get_queryset(self):
+        return LT40QuerySet(model=self.model, using=self._db)
 
 
 class Region(Model):
@@ -20,7 +32,7 @@ class Region(Model):
 
 
 class Order(Model):
-    objects = CTEManager()
+    objects = LT40Manager.from_queryset(LT40QuerySet)()
     id = AutoField(primary_key=True)
     region = ForeignKey(Region, on_delete=CASCADE)
     amount = IntegerField(default=0)

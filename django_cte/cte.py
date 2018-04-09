@@ -94,9 +94,9 @@ class With(object):
         """
         cte_qs = self._queryset
         cte_query = cte_qs.query
-        model = cte_query.model
+        qs = cte_qs.model.objects.get_queryset()
 
-        query = CTEQuery(model)
+        query = CTEQuery(cte_qs.model)
         query.join(BaseTable(self.name, None))
         query.default_cols = cte_query.default_cols
         if cte_query._annotations:
@@ -107,12 +107,7 @@ class With(object):
             query.set_values(cte_query.values_select)
         query.annotation_select_mask = cte_query.annotation_select_mask
 
-        qs = CTEQuerySet(
-            model=model,
-            query=query,
-            using=cte_qs._db,
-            hints=cte_qs._hints,
-        )
+        qs.query = query
         qs._iterable_class = cte_qs._iterable_class
         qs._fields = cte_qs._fields
         return qs
