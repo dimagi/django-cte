@@ -1,5 +1,10 @@
 # Django CTE change log
 
+## v1.1.0 - 2018-04-09
+
+- `With.queryset()` now uses the CTE model's manager to create a new `QuerySet`,
+  which makes it easier to work with custom `QuerySet` classes.
+
 ## v1.0.0 - 2018-04-04
 
 - BACKWARD INCOMPATIBLE CHANGE: `With.queryset()` no longer accepts a `model`
