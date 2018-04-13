@@ -1,5 +1,10 @@
 # Django CTE change log
 
+## v1.1.1 - 2018-04-13
+
+- Fix recursive CTE pickling. Note: this is currently [broken on Django
+  master](https://github.com/django/django/pull/9134#pullrequestreview-112057277).
+
 ## v1.1.0 - 2018-04-09
 
 - `With.queryset()` now uses the CTE model's manager to create a new `QuerySet`,
