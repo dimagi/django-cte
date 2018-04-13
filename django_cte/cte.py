@@ -2,7 +2,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 from django.db.models import Manager
-from django.db.models.query import Q, QuerySet
+from django.db.models.query import Q, QuerySet, ValuesIterable
 from django.db.models.sql.datastructures import BaseTable
 
 from .join import QJoin, INNER
@@ -24,8 +24,15 @@ class With(object):
     """
 
     def __init__(self, queryset, name="cte"):
-        self._queryset = queryset
+        self.query = None if queryset is None else queryset.query
         self.name = name
+        self.col = CTEColumns(self)
+
+    def __getstate__(self):
+        return (self.query, self.name)
+
+    def __setstate__(self, state):
+        self.query, self.name = state
         self.col = CTEColumns(self)
 
     def __repr__(self):
@@ -43,7 +50,7 @@ class With(object):
         :returns: The fully constructed recursive cte object.
         """
         cte = cls(None, name)
-        cte._queryset = make_cte_queryset(cte)
+        cte.query = make_cte_queryset(cte).query
         return cte
 
     def join(self, model_or_queryset, *filter_q, **filter_kw):
@@ -92,11 +99,10 @@ class With(object):
 
         :returns: A queryset.
         """
-        cte_qs = self._queryset
-        cte_query = cte_qs.query
-        qs = cte_qs.model.objects.get_queryset()
+        cte_query = self.query
+        qs = cte_query.model.objects.get_queryset()
 
-        query = CTEQuery(cte_qs.model)
+        query = CTEQuery(cte_query.model)
         query.join(BaseTable(self.name, None))
         query.default_cols = cte_query.default_cols
         if cte_query._annotations:
@@ -105,15 +111,14 @@ class With(object):
                 query.add_annotation(col, alias)
         if cte_query.values_select:
             query.set_values(cte_query.values_select)
+            qs._iterable_class = ValuesIterable
         query.annotation_select_mask = cte_query.annotation_select_mask
 
         qs.query = query
-        qs._iterable_class = cte_qs._iterable_class
-        qs._fields = cte_qs._fields
         return qs
 
     def _resolve_ref(self, name):
-        return self._queryset.query.resolve_ref(name)
+        return self.query.resolve_ref(name)
 
 
 class CTEManager(Manager):

@@ -31,7 +31,7 @@ class CTEColumn(Expression):
 
     @property
     def _ref(self):
-        if self._cte._queryset is None:
+        if self._cte.query is None:
             raise ValueError(
                 "cannot resolve '{cte}.{name}' in recursive CTE setup. "
                 "Hint: use ExpressionWrapper({cte}.col.{name}, "

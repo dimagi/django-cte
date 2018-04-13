@@ -69,7 +69,7 @@ class CTECompiler(object):
         ctes = []
         params = []
         for cte in query._with_ctes:
-            compiler = cte._queryset.query.get_compiler(connection=connection)
+            compiler = cte.query.get_compiler(connection=connection)
             cte_sql, cte_params = compiler.as_sql()
             ctes.append(cls.TEMPLATE.format(name=cte.name, query=cte_sql))
             params.extend(cte_params)

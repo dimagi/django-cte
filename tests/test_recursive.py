@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import pickle
 from unittest import SkipTest
 
 from django.db.models import IntegerField, TextField
@@ -192,3 +193,24 @@ class TestRecursiveCTE(TestCase):
 
         data = [r.name for r in regions]
         self.assertEqual(data, ['earth', 'moon', 'sun'])
+
+    def test_pickle_recursive_cte_queryset(self):
+        def make_regions_cte(cte):
+            return Region.objects.filter(
+                parent__isnull=True
+            ).annotate(
+                depth=Value(0, output_field=int_field),
+            ).union(
+                cte.join(Region, parent=cte.col.name).annotate(
+                    depth=cte.col.depth + Value(1, output_field=int_field),
+                ),
+                all=True,
+            )
+        cte = With.recursive(make_regions_cte)
+        regions = cte.queryset().with_cte(cte).filter(depth=2).order_by("name")
+
+        pickled_qs = pickle.loads(pickle.dumps(regions))
+
+        data = [(r.name, r.depth) for r in pickled_qs]
+        self.assertEqual(data, [(r.name, r.depth) for r in regions])
+        self.assertEqual(data, [('deimos', 2), ('moon', 2), ('phobos', 2)])
