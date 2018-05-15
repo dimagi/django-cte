@@ -74,7 +74,7 @@ class With(object):
         if isinstance(model_or_queryset, QuerySet):
             queryset = model_or_queryset.all()
         else:
-            queryset = model_or_queryset.objects.all()
+            queryset = model_or_queryset._default_manager.all()
         join_type = filter_kw.pop("_join_type", INNER)
         query = queryset.query
 
@@ -100,7 +100,7 @@ class With(object):
         :returns: A queryset.
         """
         cte_query = self.query
-        qs = cte_query.model.objects.get_queryset()
+        qs = cte_query.model._default_manager.get_queryset()
 
         query = CTEQuery(cte_query.model)
         query.join(BaseTable(self.name, None))
