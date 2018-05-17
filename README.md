@@ -1,5 +1,8 @@
 # Common Table Expressions (CTE) for Django
 
+[![Build Status](https://travis-ci.org/dimagi/django-cte.png)](https://travis-ci.org/dimagi/django-cte)
+[![PyPI version](https://badge.fury.io/py/django-cte.svg)](https://badge.fury.io/py/django-cte)
+
 ## Installation
 ```
 pip install django-cte
