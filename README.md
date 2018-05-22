@@ -109,17 +109,10 @@ flake8 --config=setup.cfg
 
 ## Uploading to PyPI
 
-Optional: install `pandoc` for prettier README on PyPI. Use your preferred
-package manager to do this. Then install `pypandoc`.
+Package and upload the generated files.
 
 ```
-pip install pypandoc
-```
-
-Finally package and upload the generated files.
-
-```
-pip install twine wheel
+pip install -r pkg-requires.txt
 
 python setup.py sdist bdist_wheel
 twine upload dist/*

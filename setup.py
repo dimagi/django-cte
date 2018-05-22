@@ -17,13 +17,8 @@ def get_version(filename):
 
 def read_md(filename):
     path = os.path.join(os.path.dirname(__file__), filename)
-    try:
-        from pypandoc import convert
-        return convert(path, 'rst')
-    except ImportError:
-        print("warning: pypandoc not found, could not convert Markdown to RST")
-        with open(path, encoding='utf-8') as handle:
-            return handle.read()
+    with open(path, encoding='utf-8') as handle:
+        return handle.read()
 
 
 setup(
@@ -31,6 +26,7 @@ setup(
     version=get_version('django_cte/__init__.py'),
     description='Common Table Expressions (CTE) for Django',
     long_description=read_md('README.md'),
+    long_description_content_type='text/markdown',
     maintainer='Daniel Miller',
     maintainer_email='millerdev@gmail.com',
     url='https://github.com/dimagi/django-cte',
