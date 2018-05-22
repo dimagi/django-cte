@@ -1,5 +1,9 @@
 # Django CTE change log
 
+## v1.1.2 - 2018-05-22
+
+- Use `_default_manager` instead of `objects`.
+
 ## v1.1.1 - 2018-04-13
 
 - Fix recursive CTE pickling. Note: this is currently [broken on Django
