@@ -1,5 +1,9 @@
 # Django CTE change log
 
+## v1.1.3 - 2018-06-19
+
+- Fix CTE alias bug.
+
 ## v1.1.2 - 2018-05-22
 
 - Use `_default_manager` instead of `objects`.
