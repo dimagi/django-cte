@@ -105,7 +105,7 @@ class With(object):
         query = CTEQuery(cte_query.model)
         query.join(BaseTable(self.name, None))
         query.default_cols = cte_query.default_cols
-        if cte_query._annotations:
+        if cte_query.annotations:
             for alias, value in cte_query.annotations.items():
                 col = CTEColumnRef(alias, value.output_field)
                 query.add_annotation(col, alias)
