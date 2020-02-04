@@ -92,7 +92,7 @@ class With(object):
     def queryset(self):
         """Get a queryset selecting from this CTE
 
-        This CTE will be refernced by the returned queryset, but the
+        This CTE will be referenced by the returned queryset, but the
         corresponding `WITH ...` statement will not be prepended to the
         queryset's SQL output; use `<CTEQuerySet>.with_cte(cte)` to
         achieve that outcome.
@@ -107,7 +107,7 @@ class With(object):
         query.default_cols = cte_query.default_cols
         if cte_query.annotations:
             for alias, value in cte_query.annotations.items():
-                col = CTEColumnRef(alias, value.output_field)
+                col = CTEColumnRef(alias, self.name, value.output_field)
                 query.add_annotation(col, alias)
         if cte_query.values_select:
             query.set_values(cte_query.values_select)
