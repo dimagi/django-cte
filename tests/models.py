@@ -5,6 +5,7 @@ from django.db.models import (
     CASCADE,
     Model,
     AutoField,
+    CharField,
     ForeignKey,
     IntegerField,
     TextField,
@@ -36,3 +37,10 @@ class Order(Model):
     id = AutoField(primary_key=True)
     region = ForeignKey(Region, on_delete=CASCADE)
     amount = IntegerField(default=0)
+
+
+class KeyPair(Model):
+    objects = CTEManager()
+    key = CharField(max_length=32)
+    value = IntegerField(default=0)
+    parent = ForeignKey("self", null=True, on_delete=CASCADE)

@@ -72,24 +72,39 @@ class CTEColumn(Expression):
 
 class CTEColumnRef(Expression):
 
-    def __init__(self, name, output_field):
+    def __init__(self, name, cte_name, output_field):
         self.name = name
+        self.cte_name = cte_name
         self.output_field = output_field
         self._alias = None
 
     def resolve_expression(self, query=None, allow_joins=True, reuse=None,
                            summarize=False, for_save=False):
-        ref = self.copy()
-        ref._alias = query.get_initial_alias()
-        return ref
-
-    def relabeled_clone(self, relabels):
-        if self._alias is not None and self._alias in relabels:
+        if query:
             clone = self.copy()
-            clone._alias = relabels[self._alias]
+            clone._alias = self._alias or query.table_map.get(
+                self.cte_name, [self.cte_name])[0]
             return clone
-        return self
+        return super(CTEColumnRef, self).resolve_expression(
+            query, allow_joins, reuse, summarize, for_save)
+
+    def relabeled_clone(self, change_map):
+        if (
+            self.cte_name not in change_map
+            and self._alias not in change_map
+        ):
+            return super(CTEColumnRef, self).relabeled_clone(change_map)
+
+        clone = self.copy()
+        if self.cte_name in change_map:
+            clone._alias = change_map[self.cte_name]
+
+        if self._alias in change_map:
+            clone._alias = change_map[self._alias]
+        return clone
 
     def as_sql(self, compiler, connection):
-        qn = connection.ops.quote_name
-        return "%s.%s" % (self._alias, qn(self.name)), []
+        qn = compiler.quote_name_unless_alias
+        table = self._alias or compiler.query.table_map.get(
+            self.cte_name, [self.cte_name])[0]
+        return "%s.%s" % (qn(table), qn(self.name)), []

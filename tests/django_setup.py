@@ -5,7 +5,7 @@ import sys
 
 from django.db import connection
 
-from .models import Region, Order
+from .models import KeyPair, Region, Order
 
 is_initialized = False
 
@@ -76,3 +76,12 @@ def setup_data():
     ]:
         order = Order(amount=amount, region=regions[region])
         order.save()
+
+    for key, value, parent in [
+        ("level 1", 1, None),
+        ("level 2", 1, "level 1"),
+        ("level 2", 2, "level 1"),
+        ("level 3", 1, "level 2"),
+    ]:
+        parent = parent and KeyPair.objects.filter(key=parent).first()
+        KeyPair.objects.create(key=key, value=value, parent=parent)
