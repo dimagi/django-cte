@@ -1,5 +1,13 @@
 # Django CTE change log
 
+## v1.1.5 - 2020-02-07
+
+- Django 3 compatibility. Thank you @tim-schilling and @ryanhiebert!
+
+## v1.1.4 - 2018-07-30
+
+- Python 3 compatibility.
+
 ## v1.1.3 - 2018-06-19
 
 - Fix CTE alias bug.
