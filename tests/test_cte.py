@@ -5,8 +5,10 @@ from __future__ import print_function
 from unittest import SkipTest
 
 from django.db.models import IntegerField, TextField
-from django.db.models.aggregates import Count, Sum
-from django.db.models.expressions import Exists, F, OuterRef, Subquery, Value
+from django.db.models.aggregates import Count, Max, Min, Sum
+from django.db.models.expressions import (
+    Exists, ExpressionWrapper, F, OuterRef, Subquery, Value,
+)
 from django.db.models.functions import Concat
 from django.test import TestCase
 
@@ -322,4 +324,49 @@ class TestCTE(TestCase):
             ('earth', 32),
             ('earth', 33),
             ('proxima centauri', 2000),
+        ])
+
+    def test_outerref_in_cte_query(self):
+        # This query is meant to return the difference between min and max
+        # order of each region, through a subquery
+        min_and_max = With(
+            Order.objects
+            .filter(region=OuterRef("pk"))
+            .values('region')  # This is to force group by region_id
+            .annotate(
+                amount_min=Min("amount"),
+                amount_max=Max("amount"),
+            )
+            .values('amount_min', 'amount_max')
+        )
+        regions = (
+            Region.objects
+            .annotate(
+                difference=Subquery(
+                    min_and_max.queryset().with_cte(min_and_max).annotate(
+                        difference=ExpressionWrapper(
+                            F('amount_max') - F('amount_min'),
+                            output_field=int_field,
+                        ),
+                    ).values('difference')[:1],
+                    output_field=IntegerField()
+                )
+            )
+            .order_by("name")
+        )
+        print(regions.query)
+
+        data = [(r.name, r.difference) for r in regions]
+        self.assertEqual(data, [
+            ("bernard's star", None),
+            ('deimos', None),
+            ('earth', 3),
+            ('mars', 2),
+            ('mercury', 2),
+            ('moon', 2),
+            ('phobos', None),
+            ('proxima centauri', 0),
+            ('proxima centauri b', 2),
+            ('sun', 0),
+            ('venus', 3)
         ])
