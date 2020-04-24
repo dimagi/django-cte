@@ -21,6 +21,7 @@ class QJoin(object):
         self.table_name = table_name
         self.table_alias = table_alias
         self.on_clause = on_clause
+        self.join_field = _get_join_field(on_clause)
         self.join_type = join_type  # LOUTER or INNER
         self.nullable = join_type != INNER if nullable is None else nullable
 
@@ -59,3 +60,10 @@ class QJoin(object):
                 self.join_type == other.join_type
             )
         return False
+
+
+def _get_join_field(on_clause):
+    # HACK this seems fragile
+    # The LHS field _should_ be first, but what if it's not?
+    # What if there is more than one condition and by extension join field?
+    return on_clause.get_group_by_cols()[0].field
