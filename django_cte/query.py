@@ -10,6 +10,8 @@ from django.db.models.sql.compiler import (
     SQLUpdateCompiler,
 )
 
+from .expressions import CTESubqueryResolver
+
 
 class CTEQuery(Query):
     """A Query which processes SQL compilation through the CTE compiler"""
@@ -41,6 +43,10 @@ class CTEQuery(Query):
         # Instantiate the custom compiler.
         klass = COMPILER_TYPES.get(self.__class__, CTEQueryCompiler)
         return klass(self, connection, using)
+
+    def add_annotation(self, annotation, *args, **kw):
+        annotation = CTESubqueryResolver(annotation)
+        super(CTEQuery, self).add_annotation(annotation, *args, **kw)
 
     def __chain(self, _name, klass=None, *args, **kwargs):
         klass = QUERY_TYPES.get(klass, self.__class__)
