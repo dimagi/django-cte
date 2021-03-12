@@ -192,6 +192,57 @@ class TestCTE(TestCase):
             ('venus', 23, 'sun'),
         ])
 
+    def test_named_simple_ctes(self):
+        totals = With(
+            Order.objects
+            .filter(region__parent="sun")
+            .values("region_id")
+            .annotate(total=Sum("amount")),
+            name="totals",
+        )
+        region_count = With(
+            Region.objects
+            .filter(parent="sun")
+            .values("parent")
+            .annotate(num=Count("name")),
+            name="region_count",
+        )
+        orders = (
+            region_count.join(
+                totals.join(Order, region=totals.col.region_id),
+                region__parent=region_count.col.parent_id
+            )
+            .with_cte(totals)
+            .with_cte(region_count)
+            .annotate(region_total=totals.col.total)
+            .annotate(region_count=region_count.col.num)
+            .order_by("amount")
+        )
+        print(orders.query)
+
+        data = [(
+            o.amount,
+            o.region_id,
+            o.region_count,
+            o.region_total,
+        ) for o in orders]
+        self.assertEqual(data, [
+            (10, 'mercury', 4, 33),
+            (11, 'mercury', 4, 33),
+            (12, 'mercury', 4, 33),
+            (20, 'venus', 4, 86),
+            (21, 'venus', 4, 86),
+            (22, 'venus', 4, 86),
+            (23, 'venus', 4, 86),
+            (30, 'earth', 4, 126),
+            (31, 'earth', 4, 126),
+            (32, 'earth', 4, 126),
+            (33, 'earth', 4, 126),
+            (40, 'mars', 4, 123),
+            (41, 'mars', 4, 123),
+            (42, 'mars', 4, 123),
+        ])
+
     def test_named_ctes(self):
         def make_paths_cte(paths):
             return Region.objects.filter(
