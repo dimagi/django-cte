@@ -74,7 +74,7 @@ class With(object):
         if isinstance(model_or_queryset, QuerySet):
             queryset = model_or_queryset.all()
         else:
-            queryset = model_or_queryset._default_manager.all()
+            queryset = self.get_manager(model_or_queryset).all()
         join_type = filter_kw.pop("_join_type", INNER)
         query = queryset.query
 
@@ -89,6 +89,16 @@ class With(object):
         query.join(QJoin(parent, self.name, self.name, on_clause, join_type))
         return queryset
 
+    def get_manager(self, model):
+        """Get a manager for this model
+
+        The model's default_manager will be used by default.
+        This method may be over-riden to use custom managers
+
+        :returns: A manager.
+        """
+        return model._default_manager
+
     def queryset(self):
         """Get a queryset selecting from this CTE
 
@@ -100,7 +110,7 @@ class With(object):
         :returns: A queryset.
         """
         cte_query = self.query
-        qs = cte_query.model._default_manager.get_queryset()
+        qs = self.get_manager(cte_query.model).get_queryset()
 
         query = CTEQuery(cte_query.model)
         query.join(BaseTable(self.name, None))
