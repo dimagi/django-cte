@@ -49,6 +49,11 @@ class CTEColumn(Expression):
 
     @property
     def output_field(self):
+        # required to fix error caused by django commit
+        #     9d519d3dc4e5bd1d9ff3806b44624c3e487d61c1
+        if self._cte.query is None:
+            raise AttributeError
+
         if self._output_field is not None:
             return self._output_field
         return self._ref.output_field
