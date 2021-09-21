@@ -19,17 +19,21 @@ def raw_cte_sql(sql, params, refs):
             return []
 
     class raw_cte_compiler(object):
-        def as_sql(self, ):
+
+        def __init__(self, connection):
+            self.connection = connection
+
+        def as_sql(self):
             return sql, params
 
         def quote_name_unless_alias(self, name):
-            return name
+            return self.connection.ops.quote_name(name)
 
     class raw_cte_queryset(object):
         class query(object):
             @staticmethod
             def get_compiler(connection):
-                return raw_cte_compiler()
+                return raw_cte_compiler(connection)
 
             @staticmethod
             def resolve_ref(name):
