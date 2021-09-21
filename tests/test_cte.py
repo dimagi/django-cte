@@ -55,6 +55,24 @@ class TestCTE(TestCase):
             (42, 'mars', 123),
         ])
 
+    def test_cte_name_escape(self):
+        totals = With(
+            Order.objects
+            .filter(region__parent="sun")
+            .values("region_id")
+            .annotate(total=Sum("amount")),
+            name="mixedCaseCTEName"
+        )
+        orders = (
+            totals
+            .join(Order, region=totals.col.region_id)
+            .with_cte(totals)
+            .annotate(region_total=totals.col.total)
+            .order_by("amount")
+        )
+        self.assertTrue(
+            str(orders.query).startswith('WITH RECURSIVE "mixedCaseCTEName"'))
+
     def test_cte_queryset(self):
         sub_totals = With(
             Order.objects
