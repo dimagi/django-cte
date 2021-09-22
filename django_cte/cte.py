@@ -121,13 +121,6 @@ class With(object):
         return self.query.resolve_ref(name)
 
 
-class CTEManager(Manager):
-    """Manager for models that perform CTE queries"""
-
-    def get_queryset(self):
-        return CTEQuerySet(self.model, using=self._db)
-
-
 class CTEQuerySet(QuerySet):
     """QuerySet with support for Common Table Expressions"""
 
@@ -148,3 +141,24 @@ class CTEQuerySet(QuerySet):
         qs = self._clone()
         qs.query._with_ctes.append(cte)
         return qs
+
+    def as_manager(cls):
+        # Address the circular dependency between
+        # `CTEQuerySet` and `CTEManager`.
+        manager = CTEManager.from_queryset(cls)()
+        manager._built_with_as_manager = True
+        return manager
+    as_manager.queryset_only = True
+    as_manager = classmethod(as_manager)
+
+
+class CTEManager(Manager.from_queryset(CTEQuerySet)):
+    """Manager for models that perform CTE queries"""
+
+    @classmethod
+    def from_queryset(cls, queryset_class, class_name=None):
+        if not issubclass(queryset_class, CTEQuerySet):
+            raise TypeError(
+                "models with CTE support need to use a CTEQuerySet")
+        return super(CTEManager, cls).from_queryset(
+            queryset_class, class_name=class_name)

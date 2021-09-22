@@ -20,10 +20,20 @@ class LT40QuerySet(CTEQuerySet):
         return self.filter(amount__lt=40)
 
 
-class LT40Manager(CTEManager):
+class LT30QuerySet(CTEQuerySet):
 
-    def get_queryset(self):
-        return LT40QuerySet(model=self.model, using=self._db)
+    def lt30(self):
+        return self.filter(amount__lt=30)
+
+
+class LT25QuerySet(CTEQuerySet):
+
+    def lt25(self):
+        return self.filter(amount__lt=25)
+
+
+class LTManager(CTEManager):
+    pass
 
 
 class Region(Model):
@@ -33,10 +43,34 @@ class Region(Model):
 
 
 class Order(Model):
-    objects = LT40Manager.from_queryset(LT40QuerySet)()
+    objects = CTEManager()
     id = AutoField(primary_key=True)
     region = ForeignKey(Region, on_delete=CASCADE)
     amount = IntegerField(default=0)
+
+
+class OrderFromLT40(Order):
+    class Meta:
+        proxy = True
+    objects = CTEManager.from_queryset(LT40QuerySet)()
+
+
+class OrderLT40AsManager(Order):
+    class Meta:
+        proxy = True
+    objects = LT40QuerySet.as_manager()
+
+
+class OrderCustomManagerNQuery(Order):
+    class Meta:
+        proxy = True
+    objects = LTManager.from_queryset(LT25QuerySet)()
+
+
+class OrderCustomManager(Order):
+    class Meta:
+        proxy = True
+    objects = LTManager()
 
 
 class KeyPair(Model):
