@@ -44,6 +44,38 @@ Orders returned by this query will have a `region_total` attribute containing
 the sum of all order amounts in the order's region.
 
 
+### Simple Common Table Expressions with custom Manager and QuerySets
+
+If you need to use a custom `QuerySets` these should have a base class derived
+from `QTEQuerySet`.
+
+
+class PremiumOrdersQueySet(CTEQuerySet):
+    return self.filter(amount__gt=100)
+
+
+class PremiumOrders(Orders):
+    class Meta:
+        proxy = True
+
+    objects = PremiumOrdersQueySet.as_manager()
+
+
+These can also be use with custom `Manager` or `Manager` and `QuerySet`
+
+class CustomManager(CTEManager):
+    def special_method(self):
+        return
+
+
+class AltOrders(Orders):
+    class Meta:
+        proxy = True
+
+    premium = CustomManager.from_queryset(PremiumOrdersQueySet)()
+    objects = CustomManager()
+
+
 ### Recursive Common Table Expressions
 
 Recursive CTE queries can be constructed using `With.recursive`.
