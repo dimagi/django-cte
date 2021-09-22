@@ -55,6 +55,12 @@ class OrderFromLT40(Order):
     objects = CTEManager.from_queryset(LT40QuerySet)()
 
 
+class OrderLT40AsManager(Order):
+    class Meta:
+        proxy = True
+    objects = LT40QuerySet.as_manager()
+
+
 class OrderCustomManagerNQuery(Order):
     class Meta:
         proxy = True

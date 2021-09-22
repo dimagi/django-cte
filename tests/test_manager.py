@@ -11,6 +11,7 @@ from django_cte import With, CTEQuerySet, CTEManager
 from .models import (
     Order,
     OrderFromLT40,
+    OrderLT40AsManager,
     OrderCustomManagerNQuery,
     OrderCustomManager,
     LT40QuerySet,
@@ -26,6 +27,9 @@ class TestCTE(TestCase):
 
     def test_cte_queryset_correct_from_queryset(self):
         self.assertEqual(type(OrderFromLT40.objects.all()), LT40QuerySet)
+
+    def test_cte_queryset_correct_queryset_as_manager(self):
+        self.assertEqual(type(OrderLT40AsManager.objects.all()), LT40QuerySet)
 
     def test_cte_queryset_correct_manager_n_from_queryset(self):
         self.assertIsInstance(
