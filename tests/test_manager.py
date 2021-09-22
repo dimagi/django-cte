@@ -11,14 +11,13 @@ from django_cte import With, CTEQuerySet, CTEManager
 from .models import (
     Order,
     OrderFromLT40,
-    OrderCustomLimitedManagerNQuery,
     OrderCustomManagerNQuery,
     OrderCustomManager,
     LT40QuerySet,
-    LT40Manager,
     LTManager,
     LT25QuerySet,
 )
+
 
 class TestCTE(TestCase):
     def test_cte_queryset_correct_defaultmanager(self):
@@ -45,13 +44,6 @@ class TestCTE(TestCase):
         self.assertEqual(type(OrderCustomManager._default_manager), LTManager)
         # Check the expected even if not ideal behavior occurs
         self.assertIsInstance(OrderCustomManager.objects.all(), CTEQuerySet)
-
-    def test_cte_queryset_correct_limitedmanager_n_from_queryset(self):
-        self.assertTrue(
-            isinstance(OrderCustomLimitedManagerNQuery._default_manager,
-            LT40Manager))
-        self.assertEqual(
-            type(OrderCustomLimitedManagerNQuery.objects.all()), LT40QuerySet)
 
     def test_cte_queryset_with_from_queryset(self):
         self.assertEqual(type(OrderFromLT40.objects.all()), LT40QuerySet)
