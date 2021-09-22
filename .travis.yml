@@ -14,6 +14,8 @@ env:
     - REQ="Django>=1.11,<2.0"
     - REQ="Django>=2.2,<3.0"
     - REQ="Django>=3.0,<3.1"
+    - REQ="Django>=3.1,<3.2"
+    - REQ="Django>=3.2,<3.3"
     - REQ="https://github.com/django/django/archive/master.zip#egg=Django"
 matrix:
   allow_failures:
@@ -24,9 +26,17 @@ matrix:
     - python: '2.7'
       env: REQ="Django>=3.0,<3.1"
     - python: '2.7'
+      env: REQ="Django>=3.1,<3.2"
+    - python: '2.7'
+      env: REQ="Django>=3.2,<3.3"
+    - python: '2.7'
       env: REQ="https://github.com/django/django/archive/master.zip#egg=Django"
     - python: '3.5'
       env: REQ="Django>=3.0,<3.1"
+    - python: '3.5'
+      env: REQ="Django>=3.1,<3.2"
+    - python: '3.5'
+      env: REQ="Django>=3.2,<3.3"
     - python: '3.5'
       env: REQ="https://github.com/django/django/archive/master.zip#egg=Django"
 services:
