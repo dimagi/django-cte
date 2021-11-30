@@ -47,7 +47,7 @@ the sum of all order amounts in the order's region.
 ### Simple Common Table Expressions with custom Manager and QuerySets
 
 If you need to use a custom `QuerySets` these should have a base class derived
-from `QTEQuerySet`.
+from `CTEQuerySet`.
 
 
 class PremiumOrdersQueySet(CTEQuerySet):
