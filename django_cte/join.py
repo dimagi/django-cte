@@ -25,6 +25,27 @@ class QJoin(object):
         self.join_type = join_type  # LOUTER or INNER
         self.nullable = join_type != INNER if nullable is None else nullable
 
+    @property
+    def identity(self):
+        return (
+            self.__class__,
+            self.table_name,
+            self.parent_alias,
+            self.join_field,
+            self.on_clause
+        )
+
+    def __hash__(self):
+        return hash(self.identity)
+
+    def __eq__(self, other):
+        if not isinstance(other, QJoin):
+            return NotImplemented
+        return self.identity == other.identity
+
+    def equals(self, other):
+        return self.identity[:-1] == other.identity[:-1]
+
     def as_sql(self, compiler, connection):
         """Generate join clause SQL"""
         on_clause_sql, params = self.on_clause.as_sql(compiler, connection)
@@ -50,16 +71,6 @@ class QJoin(object):
             join_type=self.join_type,
             nullable=self.nullable,
         )
-
-    def __eq__(self, other):
-        if isinstance(other, self.__class__):
-            return (
-                self.parent_alias == other.parent_alias and
-                self.table_name == other.table_name and
-                self.on_clause == other.on_clause and
-                self.join_type == other.join_type
-            )
-        return False
 
 
 def _get_join_field(on_clause):
