@@ -27,7 +27,7 @@ class CTEQuery(Query):
             self._with_ctes = other._with_ctes[:]
         return super(CTEQuery, self).combine(other, connector)
 
-    def get_compiler(self, using=None, connection=None):
+    def get_compiler(self, using=None, connection=None, elide_empty=True):
         """ Overrides the Query method get_compiler in order to return
             a CTECompiler.
         """
@@ -42,7 +42,7 @@ class CTEQuery(Query):
             connection.ops.check_expression_support(aggregate)
         # Instantiate the custom compiler.
         klass = COMPILER_TYPES.get(self.__class__, CTEQueryCompiler)
-        return klass(self, connection, using)
+        return klass(self, connection, using, elide_empty)
 
     def add_annotation(self, annotation, *args, **kw):
         annotation = CTESubqueryResolver(annotation)
