@@ -14,6 +14,7 @@ env:
     - REQ="Django>=3.0,<3.1"
     - REQ="Django>=3.1,<3.2"
     - REQ="Django>=3.2,<3.3"
+    - REQ="Django>=4.0,<4.1"
     - REQ="https://github.com/django/django/archive/refs/heads/main.zip#egg=Django"
 matrix:
   allow_failures:
