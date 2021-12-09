@@ -1,6 +1,8 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import inspect
+
 import django
 from django.db import connections
 from django.db.models.sql import DeleteQuery, Query, UpdateQuery
@@ -11,6 +13,13 @@ from django.db.models.sql.compiler import (
 )
 
 from .expressions import CTESubqueryResolver
+
+
+# elide_empty is required by Django since 4.0 but unsupported by earlier
+# versions, so runtime-probe whether we can pass it through.
+COMPILERS_USE_ELIDE_EMPTY = (
+    'elide_empty' in inspect.signature(SQLCompiler).parameters
+)
 
 
 class CTEQuery(Query):
@@ -42,6 +51,8 @@ class CTEQuery(Query):
             connection.ops.check_expression_support(aggregate)
         # Instantiate the custom compiler.
         klass = COMPILER_TYPES.get(self.__class__, CTEQueryCompiler)
+        if not COMPILERS_USE_ELIDE_EMPTY:
+            return klass(self, connection, using)
         return klass(self, connection, using, elide_empty)
 
     def add_annotation(self, annotation, *args, **kw):
