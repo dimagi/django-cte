@@ -42,8 +42,12 @@ jobs:
           --health-retries 5
     steps:
     - uses: actions/checkout@v2
+    - uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python }}
     - name: Setup
       run: |
+        python --version
         pip install --upgrade pip wheel
         pip install "${{ matrix.django }}" psycopg2-binary nose flake8
     - name: Run tests
