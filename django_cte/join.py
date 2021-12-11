@@ -31,8 +31,8 @@ class QJoin(object):
             self.__class__,
             self.table_name,
             self.parent_alias,
-            self.join_field,
-            self.on_clause
+            self.join_type,
+            self.on_clause,
         )
 
     def __hash__(self):
@@ -44,7 +44,7 @@ class QJoin(object):
         return self.identity == other.identity
 
     def equals(self, other):
-        return self.identity[:-1] == other.identity[:-1]
+        return self.identity == other.identity
 
     def as_sql(self, compiler, connection):
         """Generate join clause SQL"""
