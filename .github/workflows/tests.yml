@@ -1,0 +1,71 @@
+name: django-cte tests
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.7', '3.8', '3.9']
+        # Time to switch to pytest or nose2?
+        # nosetests is broken on 3.10
+        # AttributeError: module 'collections' has no attribute 'Callable'
+        # https://github.com/nose-devs/nose/issues/1099
+        django:
+        - 'Django>=2.2,<3.0'
+        - 'Django>=3.0,<3.1'
+        - 'Django>=3.1,<3.2'
+        - 'Django>=3.2,<3.3'
+        experimental: [false]
+        include:
+        - python: '3.9'
+          django: 'https://github.com/django/django/archive/refs/heads/main.zip#egg=Django'
+          experimental: true
+          # NOTE this job will appear to pass even when it fails because of
+          # `continue-on-error: true`. Github Actions apparently does not
+          # have this feature, similar to Travis' allow-failure, yet.
+          # https://github.com/actions/toolkit/issues/399
+    services:
+      postgres:
+        image: postgres:latest
+        env:
+          POSTGRES_DB: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python }}
+    - name: Setup
+      run: |
+        python --version
+        pip install --upgrade pip wheel
+        pip install "${{ matrix.django }}" psycopg2-binary nose flake8
+    - name: Run tests
+      env:
+        DB_SETTINGS: >-
+          {
+            "ENGINE":"django.db.backends.postgresql_psycopg2",
+            "NAME":"django_cte",
+            "USER":"postgres",
+            "PASSWORD":"postgres",
+            "HOST":"localhost",
+            "PORT":"5432"
+          }
+      run: nosetests
+      continue-on-error: ${{ matrix.experimental }}
+    - name: Check style
+      run: flake8 django_cte/ tests/
