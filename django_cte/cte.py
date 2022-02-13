@@ -53,7 +53,7 @@ class With(object):
         cte.query = make_cte_queryset(cte).query
         return cte
 
-    def join(self, model_or_queryset, *filter_q, **filter_kw):
+    def join(self, model_or_queryset, with_cte=None, *filter_q, **filter_kw):
         """Join this CTE to the given model or queryset
 
         This CTE will be refernced by the returned queryset, but the
@@ -87,9 +87,15 @@ class With(object):
 
         parent = query.get_initial_alias()
         query.join(QJoin(parent, self.name, self.name, on_clause, join_type))
-        return queryset
 
-    def queryset(self):
+        if with_cte == False:
+            return queryset
+        elif with_cte is None:
+            return queryset.with_cte(self)
+        elif isinstance(with_cte, QuerySet):
+            return queryset.with_cte(with_cte)
+
+    def queryset(self, with_cte=None):
         """Get a queryset selecting from this CTE
 
         This CTE will be referenced by the returned queryset, but the
@@ -115,6 +121,14 @@ class With(object):
         query.annotation_select_mask = cte_query.annotation_select_mask
 
         qs.query = query
+
+        if with_cte == False:
+            return qs
+        elif with_cte is None:
+            return qs.with_cte(self)
+        elif isinstance(with_cte, QuerySet):
+            return qs.with_cte(with_cte)
+
         return qs
 
     def _resolve_ref(self, name):
@@ -139,6 +153,12 @@ class CTEQuerySet(QuerySet):
         can be referenced in annotations, filters, etc.
         """
         qs = self._clone()
+
+        # If this CET was added already, honor this request to add it
+        # to the end of the list removing a prior entry if it exists.
+        if cte in qs.query._with_ctes:
+            qs.query._with_ctes.remove(cte)
+
         qs.query._with_ctes.append(cte)
         return qs
 
@@ -148,6 +168,7 @@ class CTEQuerySet(QuerySet):
         manager = CTEManager.from_queryset(cls)()
         manager._built_with_as_manager = True
         return manager
+
     as_manager.queryset_only = True
     as_manager = classmethod(as_manager)
 
