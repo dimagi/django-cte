@@ -41,8 +41,10 @@ class CTESubqueryResolver(object):
         # NOTE this uses the old (pre-Django 3) way of resolving.
         # Should a different technique should be used on Django 3+?
         clone = self.annotation.resolve_expression(*args, **kw)
+        
         if isinstance(self.annotation, Subquery):
-            for cte in get_query(clone)._with_ctes:
+            query = get_query(clone)
+            for cte in getattr(query, "_with_ctes", []):
                 resolve_all(cte.query.where)
                 for key, value in cte.query.annotations.items():
                     if isinstance(value, Subquery):
