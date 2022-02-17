@@ -410,3 +410,30 @@ class TestCTE(TestCase):
             ('sun', 0),
             ('venus', 3)
         ])
+
+    def test_annotation_on_cte_results(self):
+        # This query is meant to return the max for each region.
+        # All values are retrieved in the With to test the use of annotation on CTE.
+        all_results = With(
+            Order.objects.all()
+        )
+        max_values = (
+            all_results
+            .join(Order, region=all_results.col.region_id)
+            .with_cte(all_results)
+            .values("region_id")
+            .annotate(max_by_region=Max("amount"))
+            .order_by("region_id")
+        )
+        results = [(o["region_id"], o["max_by_region"]) for o in max_values]
+
+        self.assertEqual(results, [
+            ("earth", 33),
+            ("mars", 42),
+            ("mercury", 12),
+            ("moon", 3),
+            ("proxima centauri", 2000),
+            ("proxima centauri b", 12),
+            ("sun", 1000),
+            ("venus", 23)
+        ])
