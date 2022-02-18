@@ -88,7 +88,7 @@ class With(object):
         parent = query.get_initial_alias()
         query.join(QJoin(parent, self.name, self.name, on_clause, join_type))
 
-        if with_cte == False:
+        if with_cte == False or self.query is None:
             return queryset
         elif with_cte is None:
             return queryset.with_cte(self)
@@ -122,7 +122,7 @@ class With(object):
 
         qs.query = query
 
-        if with_cte == False:
+        if with_cte == False or self.query is None:
             return qs
         elif with_cte is None:
             return qs.with_cte(self)
@@ -154,7 +154,7 @@ class CTEQuerySet(QuerySet):
         """
         qs = self._clone()
 
-        # If this CET was added already, honor this request to add it
+        # If this CTE was added already, honor this request to add it
         # to the end of the list removing a prior entry if it exists.
         if cte in qs.query._with_ctes:
             qs.query._with_ctes.remove(cte)
