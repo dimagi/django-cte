@@ -49,7 +49,7 @@ the sum of all order amounts in the order's region.
 If you need to use a custom `QuerySets` these should have a base class derived
 from `CTEQuerySet`.
 
-
+```py
 class PremiumOrdersQueySet(CTEQuerySet):
     return self.filter(amount__gt=100)
 
@@ -59,10 +59,11 @@ class PremiumOrders(Orders):
         proxy = True
 
     objects = PremiumOrdersQueySet.as_manager()
-
+```
 
 These can also be use with custom `Manager` or `Manager` and `QuerySet`
 
+```py
 class CustomManager(CTEManager):
     def special_method(self):
         return
@@ -74,7 +75,7 @@ class AltOrders(Orders):
 
     premium = CustomManager.from_queryset(PremiumOrdersQueySet)()
     objects = CustomManager()
-
+```
 
 ### Recursive Common Table Expressions
 
