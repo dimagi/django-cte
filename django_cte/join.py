@@ -21,7 +21,6 @@ class QJoin(object):
         self.table_name = table_name
         self.table_alias = table_alias
         self.on_clause = on_clause
-        self.join_field = _get_join_field(on_clause)
         self.join_type = join_type  # LOUTER or INNER
         self.nullable = join_type != INNER if nullable is None else nullable
 
@@ -72,9 +71,23 @@ class QJoin(object):
             nullable=self.nullable,
         )
 
+    class join_field:
+        # `Join.join_field` is used internally by `Join` as well as in
+        # `QuerySet.resolve_expression()`:
+        #
+        #    isinstance(table, Join)
+        #    and table.join_field.related_model._meta.db_table != alias
+        #
+        # Currently that does not apply here since `QJoin` is not an
+        # instance of `Join`, although maybe it should? Maybe this
+        # should have `related_model._meta.db_table` return
+        # `<QJoin>.table_name` or `<QJoin>.table_alias`?
+        #
+        # `PathInfo.join_field` is another similarly named attribute in
+        # Django that has a much more complicated interface, but luckily
+        # seems unrelated to `Join.join_field`.
 
-def _get_join_field(on_clause):
-    # HACK this seems fragile
-    # The LHS field _should_ be first, but what if it's not?
-    # What if there is more than one condition and by extension join field?
-    return on_clause.get_group_by_cols()[0].field
+        class related_model:
+            class _meta:
+                # for QuerySet.set_group_by(allow_aliases=True)
+                local_concrete_fields = ()
