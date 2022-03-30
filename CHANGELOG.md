@@ -1,5 +1,13 @@
 # Django CTE change log
 
+## v1.2.0 - 2022-03-30
+
+- Add support for Django 3.1, 3.2 and 4.0.
+- Quote the CTE table name if needed.
+- Resolve `OuterRef` in CTE `Subquery`.
+- Fix default `CTEManager` so it can use `from_queryset` corectly.
+- Fix for Django 3.0.5+.
+
 ## v1.1.5 - 2020-02-07
 
 - Django 3 compatibility. Thank you @tim-schilling and @ryanhiebert!
