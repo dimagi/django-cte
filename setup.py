@@ -33,6 +33,7 @@ setup(
     license='BSD License',
     packages=find_packages(exclude=['tests']),
     include_package_data=True,
+    install_requires=['django>=2.2,<4.1'],
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Environment :: Web Environment',
