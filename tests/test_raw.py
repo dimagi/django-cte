@@ -20,7 +20,7 @@ class TestRawCTE(TestCase):
         cte = With(raw_cte_sql(
             """
             SELECT region_id, AVG(amount) AS avg_order
-            FROM tests_order
+            FROM orders
             WHERE region_id = %s
             GROUP BY region_id
             """,
@@ -33,6 +33,7 @@ class TestRawCTE(TestCase):
             .annotate(avg_order=cte.col.avg_order)
             .with_cte(cte)
         )
+        print(moon_avg.query)
 
         data = [(r.name, r.parent.name, r.avg_order) for r in moon_avg]
         self.assertEqual(data, [('moon', 'earth', 2)])
@@ -42,7 +43,7 @@ class TestRawCTE(TestCase):
             raw_cte_sql(
                 """
                 SELECT region_id, AVG(amount) AS avg_order
-                FROM tests_order
+                FROM orders
                 WHERE region_id = %s
                 GROUP BY region_id
                 """,

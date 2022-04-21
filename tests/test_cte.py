@@ -7,9 +7,9 @@ from unittest import SkipTest
 from django.db.models import IntegerField, TextField
 from django.db.models.aggregates import Count, Max, Min, Sum
 from django.db.models.expressions import (
-    Exists, ExpressionWrapper, F, OuterRef, Subquery, Value,
+    Exists, ExpressionWrapper, F, OuterRef, Subquery,
 )
-from django.db.models.functions import Concat
+from django.db.models.sql.constants import LOUTER
 from django.test import TestCase
 
 from django_cte import With
@@ -23,25 +23,35 @@ text_field = TextField()
 class TestCTE(TestCase):
 
     def test_simple_cte_query(self):
-        totals = With(
+        cte = With(
             Order.objects
-            .filter(region__parent="sun")
             .values("region_id")
             .annotate(total=Sum("amount"))
         )
-        orders = (
-            totals
-            .join(Order, region=totals.col.region_id)
-            .with_cte(totals)
-            .annotate(region_total=totals.col.total)
-            .order_by("amount")
-        )
 
-        data = [(o.amount, o.region_id, o.region_total) for o in orders]
+        orders = (
+            # FROM orders INNER JOIN cte ON orders.region_id = cte.region_id
+            cte.join(Order, region=cte.col.region_id)
+
+            # Add `WITH ...` before `SELECT ... FROM orders ...`
+            .with_cte(cte)
+
+            # Annotate each Order with a "region_total"
+            .annotate(region_total=cte.col.total)
+        )
+        print(orders.query)
+
+        data = sorted((o.amount, o.region_id, o.region_total) for o in orders)
         self.assertEqual(data, [
+            (1, 'moon', 6),
+            (2, 'moon', 6),
+            (3, 'moon', 6),
             (10, 'mercury', 33),
+            (10, 'proxima centauri b', 33),
             (11, 'mercury', 33),
+            (11, 'proxima centauri b', 33),
             (12, 'mercury', 33),
+            (12, 'proxima centauri b', 33),
             (20, 'venus', 86),
             (21, 'venus', 86),
             (22, 'venus', 86),
@@ -53,6 +63,8 @@ class TestCTE(TestCase):
             (40, 'mars', 123),
             (41, 'mars', 123),
             (42, 'mars', 123),
+            (1000, 'sun', 1000),
+            (2000, 'proxima centauri', 2000),
         ])
 
     def test_cte_name_escape(self):
@@ -87,7 +99,6 @@ class TestCTE(TestCase):
                     sub_totals.queryset()
                     .filter(region_parent=OuterRef("name"))
                     .values("total"),
-                    output_field=int_field  # needed for Django 1.11, not 2.x
                 ),
             )
             .order_by("name")
@@ -114,10 +125,11 @@ class TestCTE(TestCase):
             Order.objects
             .annotate(region_parent=F("region__parent_id")),
         )
-        orders = cte.queryset().with_cte(cte).order_by("region_id", "amount")
+        orders = cte.queryset().with_cte(cte)
         print(orders.query)
 
-        data = [(x.region_id, x.amount, x.region_parent) for x in orders][:5]
+        data = sorted(
+            (x.region_id, x.amount, x.region_parent) for x in orders)[:5]
         self.assertEqual(data, [
             ("earth", 30, "sun"),
             ("earth", 31, "sun"),
@@ -165,11 +177,13 @@ class TestCTE(TestCase):
             cte.queryset()
             .with_cte(cte)
             .filter(region_parent__isnull=False)
-            .order_by("region_parent", "region_id")
         )
         print(values.query)
 
-        data = list(values)[:5]
+        def key(item):
+            return item["region_parent"], item["region_id"]
+
+        data = sorted(values, key=key)[:5]
         self.assertEqual(data, [
             {'region_id': 'moon', 'region_parent': 'earth'},
             {
@@ -233,77 +247,51 @@ class TestCTE(TestCase):
         ])
 
     def test_named_ctes(self):
-        def make_paths_cte(paths):
+        def make_root_mapping(rootmap):
             return Region.objects.filter(
                 parent__isnull=True
             ).values(
                 "name",
-                path=F("name"),
+                root=F("name"),
             ).union(
-                paths.join(Region, parent=paths.col.name).values(
+                rootmap.join(Region, parent=rootmap.col.name).values(
                     "name",
-                    path=Concat(
-                        paths.col.path, Value(" "), F("name"),
-                        output_field=text_field,
-                    ),
+                    root=rootmap.col.root,
                 ),
                 all=True,
             )
-        paths = With.recursive(make_paths_cte, name="region_paths")
+        rootmap = With.recursive(make_root_mapping, name="rootmap")
 
-        def make_groups_cte(groups):
-            return paths.join(Region, name=paths.col.name).values(
-                "name",
-                parent_path=paths.col.path,
-                parent_name=F("name"),
-            ).union(
-                groups.join(Region, parent=groups.col.name).values(
-                    "name",
-                    parent_path=groups.col.parent_path,
-                    parent_name=groups.col.parent_name,
-                ),
-                all=True,
-            )
-        groups = With.recursive(make_groups_cte, name="region_groups")
-
-        region_totals = With(
-            groups.join(Order, region_id=groups.col.name)
+        totals = With(
+            rootmap.join(Order, region_id=rootmap.col.name)
             .values(
-                name=groups.col.parent_name,
-                path=groups.col.parent_path,
+                root=rootmap.col.root,
             ).annotate(
                 orders_count=Count("id"),
                 region_total=Sum("amount"),
             ),
-            name="region_totals",
+            name="totals",
         )
 
-        regions = (
-            region_totals.join(Region, name=region_totals.col.name)
-            .with_cte(paths)
-            .with_cte(groups)
-            .with_cte(region_totals)
+        root_regions = (
+            totals.join(Region, name=totals.col.root)
+            .with_cte(rootmap)
+            .with_cte(totals)
             .annotate(
-                path=region_totals.col.path,
                 # count of orders in this region and all subregions
-                orders_count=region_totals.col.orders_count,
+                orders_count=totals.col.orders_count,
                 # sum of order amounts in this region and all subregions
-                region_total=region_totals.col.region_total,
+                region_total=totals.col.region_total,
             )
-            .order_by("path")
         )
-        print(regions.query)
+        print(root_regions.query)
 
-        data = [(r.name, r.orders_count, r.region_total) for r in regions]
+        data = sorted(
+            (r.name, r.orders_count, r.region_total) for r in root_regions
+        )
         self.assertEqual(data, [
             ('proxima centauri', 4, 2033),
-            ('proxima centauri b', 3, 33),
             ('sun', 18, 1374),
-            ('earth', 7, 132),
-            ('moon', 3, 6),
-            ('mars', 3, 123),
-            ('mercury', 3, 33),
-            ('venus', 4, 86),
         ])
 
     def test_update_cte_query(self):
@@ -409,4 +397,47 @@ class TestCTE(TestCase):
             ('proxima centauri b', 2),
             ('sun', 0),
             ('venus', 3)
+        ])
+
+    def test_experimental_left_outer_join(self):
+        totals = With(
+            Order.objects
+            .values("region_id")
+            .annotate(total=Sum("amount"))
+            .filter(total__gt=100)
+        )
+        orders = (
+            totals
+            .join(Order, region=totals.col.region_id, _join_type=LOUTER)
+            .with_cte(totals)
+            .annotate(region_total=totals.col.total)
+        )
+        print(orders.query)
+        self.assertIn("LEFT OUTER JOIN", str(orders.query))
+        self.assertNotIn("INNER JOIN", str(orders.query))
+
+        data = sorted((o.region_id, o.amount, o.region_total) for o in orders)
+        self.assertEqual(data, [
+            ('earth', 30, 126),
+            ('earth', 31, 126),
+            ('earth', 32, 126),
+            ('earth', 33, 126),
+            ('mars', 40, 123),
+            ('mars', 41, 123),
+            ('mars', 42, 123),
+            ('mercury', 10, None),
+            ('mercury', 11, None),
+            ('mercury', 12, None),
+            ('moon', 1, None),
+            ('moon', 2, None),
+            ('moon', 3, None),
+            ('proxima centauri', 2000, 2000),
+            ('proxima centauri b', 10, None),
+            ('proxima centauri b', 11, None),
+            ('proxima centauri b', 12, None),
+            ('sun', 1000, 1000),
+            ('venus', 20, None),
+            ('venus', 21, None),
+            ('venus', 22, None),
+            ('venus', 23, None),
         ])

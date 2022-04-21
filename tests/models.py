@@ -41,12 +41,18 @@ class Region(Model):
     name = TextField(primary_key=True)
     parent = ForeignKey("self", null=True, on_delete=CASCADE)
 
+    class Meta:
+        db_table = "region"
+
 
 class Order(Model):
     objects = CTEManager()
     id = AutoField(primary_key=True)
     region = ForeignKey(Region, on_delete=CASCADE)
     amount = IntegerField(default=0)
+
+    class Meta:
+        db_table = "orders"
 
 
 class OrderFromLT40(Order):
@@ -78,3 +84,6 @@ class KeyPair(Model):
     key = CharField(max_length=32)
     value = IntegerField(default=0)
     parent = ForeignKey("self", null=True, on_delete=CASCADE)
+
+    class Meta:
+        db_table = "keypair"
