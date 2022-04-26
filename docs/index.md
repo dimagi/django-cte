@@ -81,6 +81,11 @@ FROM "orders"
 INNER JOIN "cte" ON "orders"."region_id" = "cte"."region_id"
 ```
 
+The `orders` query is a query set containing annotated `Order` objects, just as
+you would get from a query like `Order.objects.annotate(region_total=...)`. Each
+`Order` object will be annotated with a `region_total` attribute, which is
+populated with the value of the corresponding total from the joined CTE query.
+
 
 ## Recursive Common Table Expressions
 
