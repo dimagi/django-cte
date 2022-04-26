@@ -1,4 +1,4 @@
-# Common Table Expressions (CTE) for Django
+# Common Table Expressions with Django
 
 [![Build Status](https://travis-ci.com/dimagi/django-cte.png)](https://travis-ci.com/dimagi/django-cte)
 [![PyPI version](https://badge.fury.io/py/django-cte.svg)](https://badge.fury.io/py/django-cte)

@@ -1,10 +1,4 @@
-# Installation
-```
-pip install django-cte
-```
-
-
-# Usage
+# Common Table Expressions with Django
 
 A Common Table Expression acts like a temporary table or view that exists only
 for the duration of the query it is attached to. django-cte allows common table
