@@ -26,6 +26,9 @@ nosetests
 flake8 --config=setup.cfg
 ```
 
+All feature and bug contributions are expected to be covered by tests.
+
+
 ## Uploading to PyPI
 
 Package and upload the generated files.
