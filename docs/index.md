@@ -1,3 +1,6 @@
+* Table of contents (this line will not be displayed).
+{:toc}
+
 # Common Table Expressions with Django
 
 A Common Table Expression acts like a temporary table or view that exists only

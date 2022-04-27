@@ -1,2 +1,5 @@
 title: django-cte
 author: Dimagi
+markdown: kramdown
+kramdown:
+  toc_levels: 2..3
