@@ -80,7 +80,7 @@ you would get from a query like `Order.objects.annotate(region_total=...)`. Each
 `Order` object will be annotated with a `region_total` attribute, which is
 populated with the value of the corresponding total from the joined CTE query.
 
-You may have noticed the CTE in this query uses `WITH RECURSIVE` even thought
+You may have noticed the CTE in this query uses `WITH RECURSIVE` even though
 this is not a [Recursive Common Table Expression](#recursive-common-table-expressions).
 The `RECURSIVE` keyword is always used, even for non-recursive CTEs. On
 databases such as PostgreSQL and SQLite this has no effect other than allowing
