@@ -1,1 +1,4 @@
 theme: jekyll-theme-leap-day
+title: django-cte
+description: Common Table Expressions for Django
+author: Dimagi
