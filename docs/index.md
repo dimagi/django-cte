@@ -1,7 +1,7 @@
+# Common Table Expressions with Django
+
 * Table of contents (this line will not be displayed).
 {:toc}
-
-# Common Table Expressions with Django
 
 A Common Table Expression acts like a temporary table or view that exists only
 for the duration of the query it is attached to. django-cte allows common table
