@@ -2,7 +2,8 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 from django.db.models import Manager
-from django.db.models.query import Q, QuerySet, ValuesIterable
+from django.db.models.query import (
+    Q, QuerySet, ValuesIterable)
 from django.db.models.sql.datastructures import BaseTable
 
 from .join import QJoin, INNER
@@ -86,11 +87,13 @@ class With(object):
         q_object = Q(*filter_q, **filter_kw)
         map = query.alias_map
         existing_inner = set(a for a in map if map[a].join_type == INNER)
+
         on_clause, _ = query._add_q(q_object, query.used_aliases)
         query.demote_joins(existing_inner)
 
         parent = query.get_initial_alias()
-        query.join(QJoin(parent, self.name, self.name, on_clause, join_type))
+        query.join(QJoin(parent, self, self.name, on_clause, join_type))
+
         return queryset
 
     def queryset(self):
@@ -107,7 +110,7 @@ class With(object):
         qs = cte_query.model._default_manager.get_queryset()
 
         query = CTEQuery(cte_query.model)
-        query.join(BaseTable(self.name, None))
+        alias = query.join(BaseTable(self.name, None))
         query.default_cols = cte_query.default_cols
         if cte_query.annotations:
             for alias, value in cte_query.annotations.items():

@@ -3,13 +3,13 @@ from __future__ import unicode_literals
 
 import django
 from django.db import connections
-from django.db.models.sql import DeleteQuery, Query, UpdateQuery
+from django.db.models.expressions import Col
+from django.db.models.sql import DeleteQuery, Query, RawQuery, UpdateQuery
 from django.db.models.sql.compiler import (
     SQLCompiler,
     SQLDeleteCompiler,
     SQLUpdateCompiler,
 )
-
 from .expressions import CTESubqueryResolver
 
 
@@ -26,6 +26,13 @@ class CTEQuery(Query):
                 raise TypeError("cannot merge queries with CTEs on both sides")
             self._with_ctes = other._with_ctes[:]
         return super(CTEQuery, self).combine(other, connector)
+
+    def relabeled_clone(self, change_map):
+        obj = super().relabeled_clone(change_map)
+        for cte in self._with_ctes[:]:
+            if cte.name in change_map:
+                cte.name = change_map[cte.name]
+        return obj
 
     def get_compiler(self, using=None, connection=None, *args, **kwargs):
         """ Overrides the Query method get_compiler in order to return
@@ -51,6 +58,7 @@ class CTEQuery(Query):
     def __chain(self, _name, klass=None, *args, **kwargs):
         klass = QUERY_TYPES.get(klass, self.__class__)
         clone = getattr(super(CTEQuery, self), _name)(klass, *args, **kwargs)
+        # Should we clone the cte here?
         clone._with_ctes = self._with_ctes[:]
         return clone
 
@@ -66,16 +74,35 @@ class CTEQuery(Query):
 class CTECompiler(object):
 
     @classmethod
-    def generate_sql(cls, connection, query, as_sql):
+    def generate_sql(cls, connection, query, with_col_aliases, as_sql):
         if query.combinator:
             return as_sql()
 
         ctes = []
         params = []
+        if django.VERSION > (4, 2):
+            named_ctes = {cte.name: cte for cte in query._with_ctes}
+            for cte in named_ctes.values():
+                if isinstance(cte.query, RawQuery):
+                    pass
+                if isinstance(cte.query, Query):
+                    if cte.query.combinator:
+                        for subquery in cte.query.combined_queries:
+                            compiler = subquery.get_compiler(
+                                connection=connection)
+                            for idx, col in enumerate(
+                                     compiler.get_select_renamed_cols(),
+                                     start=1):
+                                column = getattr(cte.col, col.target.name)
+                                column.alias = column.name
+
+        base_sql, base_params = as_sql(
+            with_col_aliases=with_col_aliases | bool(query._with_ctes))
         for cte in query._with_ctes:
             compiler = cte.query.get_compiler(connection=connection)
             qn = compiler.quote_name_unless_alias
-            cte_sql, cte_params = compiler.as_sql()
+            cte_sql, cte_params = compiler.as_sql(
+                with_col_aliases=with_col_aliases)
             template = cls.get_cte_query_template(cte)
             ctes.append(template.format(name=qn(cte.name), query=cte_sql))
             params.extend(cte_params)
@@ -100,7 +127,6 @@ class CTECompiler(object):
             # Always use WITH RECURSIVE
             # https://www.postgresql.org/message-id/13122.1339829536%40sss.pgh.pa.us
             sql.extend(["WITH RECURSIVE", ", ".join(ctes)])
-        base_sql, base_params = as_sql()
 
         if explain_query:
             query.explain_query = explain_query
@@ -133,21 +159,100 @@ QUERY_TYPES = {
 
 class CTEQueryCompiler(SQLCompiler):
 
+    if django.VERSION > (4, 2):
+        def get_select(self, *args, **kwargs):
+            _columns, klass_info, annotations = super().get_select(
+                *args, **kwargs)
+            columns = []
+            named_ctes = {cte.name: cte for cte in self.query._with_ctes}
+            for idx, (expression, sql, calias) in enumerate(_columns, start=1):
+                if (calias and calias == f'col{idx}'):
+                    if isinstance(expression, Col):
+                        if expression.alias in named_ctes.keys():
+                            pass
+                            # NOTE: Test needed to hit this condition
+                            # columns.append([expression, sql,
+                            #                'sss' + expression.target.column])
+                            # continue
+                        elif any(map(
+                                lambda tables: expression.alias in tables,
+                                self.query.table_map.values()
+                        )):
+                            columns.append([expression, sql,
+                                            expression.target.column])
+                            continue
+                columns.append([expression, sql, calias])
+            return columns, klass_info, annotations
+
+    def get_select_renamed_cols(self):
+        assert not (self.query.select and self.query.default_cols)
+        select_mask = self.query.get_select_mask()
+        if self.query.default_cols:
+            cols = self.get_default_columns(select_mask)
+        else:
+            # self.query.select is a special case. These columns never go to
+            # any model.
+            cols = self.query.select
+        if cols:
+            return cols
+        return []
+
     def as_sql(self, *args, **kwargs):
-        def _as_sql():
-            return super(CTEQueryCompiler, self).as_sql(*args, **kwargs)
-        return CTECompiler.generate_sql(self.connection, self.query, _as_sql)
+        with_col_aliases = kwargs.get('with_col_aliases', False)
+
+        def _as_sql(with_col_aliases=False):
+            _with_col_aliases = (
+                kwargs.pop('with_col_aliases', False) or with_col_aliases)
+            return super(CTEQueryCompiler, self).as_sql(
+                *args, with_col_aliases=_with_col_aliases, **kwargs)
+
+        # We need to ensure that all cols of the CTEs subqueries have aliases.
+        sql = CTECompiler.generate_sql(
+            self.connection, self.query, with_col_aliases, _as_sql)
+        return sql
 
 
 class CTEUpdateQueryCompiler(SQLUpdateCompiler):
 
+    def get_select_renamed_cols(self,):
+        assert not (self.query.select and self.query.default_cols)
+        select_mask = self.query.get_select_mask()
+        if self.query.default_cols:
+            cols = self.get_default_columns(select_mask)
+        else:
+            # self.query.select is a special case. These columns never go to
+            # any model.
+            cols = self.query.select
+        if cols:
+            return cols
+        return []
+
     def as_sql(self, *args, **kwargs):
-        def _as_sql():
-            return super(CTEUpdateQueryCompiler, self).as_sql(*args, **kwargs)
-        return CTECompiler.generate_sql(self.connection, self.query, _as_sql)
+        with_col_aliases = kwargs.get('with_col_aliases', False)
+
+        def _as_sql(with_col_aliases=False):
+            return super(CTEUpdateQueryCompiler, self).as_sql(
+                *args,
+                **kwargs)
+
+        return CTECompiler.generate_sql(
+            self.connection, self.query, with_col_aliases, _as_sql)
 
 
 class CTEDeleteQueryCompiler(SQLDeleteCompiler):
+
+    def get_select_renamed_cols(self):
+        assert not (self.query.select and self.query.default_cols)
+        select_mask = self.query.get_select_mask()
+        if self.query.default_cols:
+            cols = self.get_default_columns(select_mask)
+        else:
+            # self.query.select is a special case. These columns never go to
+            # any model.
+            cols = self.query.select
+        if cols:
+            return cols
+        return []
 
     # NOTE: it is currently not possible to execute delete queries that
     # reference CTEs without patching `QuerySet.delete` (Django method)
@@ -155,9 +260,13 @@ class CTEDeleteQueryCompiler(SQLDeleteCompiler):
     # `sql.DeleteQuery(self.model)`
 
     def as_sql(self, *args, **kwargs):
-        def _as_sql():
+        with_col_aliases = kwargs.get('with_col_aliases', False)
+
+        def _as_sql(with_col_aliases=False):
             return super(CTEDeleteQueryCompiler, self).as_sql(*args, **kwargs)
-        return CTECompiler.generate_sql(self.connection, self.query, _as_sql)
+
+        return CTECompiler.generate_sql(
+            self.connection, self.query, with_col_aliases, _as_sql)
 
 
 COMPILER_TYPES = {
