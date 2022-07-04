@@ -2,7 +2,8 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 from django.db.models import Manager
-from django.db.models.query import Q, QuerySet, ValuesIterable
+from django.db.models.query import (
+    Q, QuerySet, ValuesIterable, EmptyQuerySet)
 from django.db.models.sql.datastructures import BaseTable
 
 from .join import QJoin, INNER
@@ -86,7 +87,7 @@ class With(object):
         query.demote_joins(existing_inner)
 
         parent = query.get_initial_alias()
-        query.join(QJoin(parent, self.name, self.name, on_clause, join_type))
+        query.join(QJoin(parent, self, self.name, on_clause, join_type))
         return queryset
 
     def queryset(self):
@@ -124,6 +125,11 @@ class With(object):
 class CTEQuerySet(QuerySet):
     """QuerySet with support for Common Table Expressions"""
 
+    def _check_operator_queryset(self, other, operator_):
+        if self.query.combinator or other.query.combinator:
+            raise TypeError(
+                f"Cannot use {operator_} operator with combined queryset.")
+
     def __init__(self, model=None, query=None, using=None, hints=None):
         # Only create an instance of a Query if this is the first invocation in
         # a query chain.
@@ -141,6 +147,46 @@ class CTEQuerySet(QuerySet):
         qs = self._clone()
         qs.query._with_ctes.append(cte)
         return qs
+
+    def union(self, *other_qs, all=False):
+        # If the query is an EmptyQuerySet, combine all nonempty querysets.
+        if isinstance(self, EmptyQuerySet):
+            qs = [q for q in other_qs if not isinstance(q, EmptyQuerySet)]
+            if not qs:
+                return self
+            if len(qs) == 1:
+                return qs[0]
+            qs[0]._combinator_cte_query(*qs[1:])
+            return qs[0]._combinator_query("union", *qs[1:], all=all)
+        extra_qs = [q._chain() for q in other_qs]
+        qs = self._clone()
+        qs._combinator_cte_query(*extra_qs)
+        return qs._combinator_query("union", *extra_qs, all=all)
+
+    def intersection(self, *other_qs):
+        # If any query is an EmptyQuerySet, return it.
+        if isinstance(self, EmptyQuerySet):
+            return self
+        for other in other_qs:
+            if isinstance(other, EmptyQuerySet):
+                return other
+        other_qs = [q._chain() for q in other_qs]
+        qs = self._clone()
+        qs._combinator_cte_query(*other_qs)
+        return qs._combinator_query("intersection", *other_qs)
+
+    def difference(self, *other_qs):
+        # If the query is an EmptyQuerySet, return it.
+        if isinstance(self, EmptyQuerySet):
+            return self
+        other_qs = [q._chain() for q in other_qs]
+        qs = self._clone()
+        qs._combinator_cte_query(*other_qs)
+        return qs._combinator_query("difference", *other_qs)
+
+    def _combinator_cte_query(self, *other_qs):
+        for other in other_qs:
+            other.query = self.query.combine_cte(other.query)
 
     def as_manager(cls):
         # Address the circular dependency between

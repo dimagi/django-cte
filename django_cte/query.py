@@ -27,6 +27,37 @@ class CTEQuery(Query):
             self._with_ctes = other._with_ctes[:]
         return super(CTEQuery, self).combine(other, connector)
 
+    def combine_cte(self, other):
+        relabel = {}
+        _names = []
+        for cte in self._with_ctes:
+            _names.append(cte.name)
+        for cte in other._with_ctes[:]:
+            if cte.name in _names:
+                if cte.name not in relabel.keys():
+                    # FIXME: we need a better way to generate names
+                    # also this prevent CTE reuse? should we identify where
+                    # they are the same? this will give performance improvement
+                    # in the materialization of the CTE
+                    relabel[cte.name] = '%s%s' % (cte.name, '1')
+            _names.append(cte.name)
+        if relabel:
+            other = other.relabeled_clone(relabel)
+        for cte in other._with_ctes[:]:
+            if cte not in self._with_ctes:
+                self._with_ctes.append(cte)
+
+        other = other.clone()
+        other._with_ctes = []
+        return other
+
+    def relabeled_clone(self, change_map):
+        obj = super().relabeled_clone(change_map)
+        for cte in self._with_ctes[:]:
+            if cte.name in change_map:
+                cte.name = change_map[cte.name]
+        return obj
+
     def get_compiler(self, using=None, connection=None, *args, **kwargs):
         """ Overrides the Query method get_compiler in order to return
             a CTECompiler.
@@ -51,6 +82,7 @@ class CTEQuery(Query):
     def __chain(self, _name, klass=None, *args, **kwargs):
         klass = QUERY_TYPES.get(klass, self.__class__)
         clone = getattr(super(CTEQuery, self), _name)(klass, *args, **kwargs)
+        # Should we clone the cte here?
         clone._with_ctes = self._with_ctes[:]
         return clone
 
