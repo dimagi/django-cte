@@ -44,6 +44,7 @@ class TestCTECombinators(TestCase):
         )
 
         orders = orders_sun.union(orders_proxima)
+        print(orders.query)
         data = sorted((o.amount, o.region_id, o.region_total) for o in orders)
         self.assertEqual(data, [
             (10, 'mercury', 33),
@@ -91,6 +92,7 @@ class TestCTECombinators(TestCase):
         )
 
         orders = orders_sun.union(orders_proxima)
+        print(orders.query)
         with self.subTest("Test union data"):
             data = sorted(
                 (o.amount, o.region_id, o.region_total) for o in orders)
@@ -114,6 +116,7 @@ class TestCTECombinators(TestCase):
                 (42, 'mars', 123)
             ])
 
+        print(orders_sun.query)
         with self.subTest("Preservation of original cte name"):
             # The original query is still using the un-renames CTE
             data = sorted(
@@ -169,7 +172,6 @@ class TestCTECombinators(TestCase):
         self.assertEqual(len(orders.query._with_ctes), 1)
 
         print(orders.query)
-
         data = sorted(
             (o.amount, o.region_id, o.region_total) for o in orders)
         self.assertEqual(data, [
@@ -230,6 +232,7 @@ class TestCTECombinators(TestCase):
         )
 
         orders = orders_small.intersection(orders_big)
+        print(orders.query)
         data = sorted(
             (o.amount, o.region_id, o.region_total) for o in orders)
         self.assertEqual(data, [
@@ -269,6 +272,7 @@ class TestCTECombinators(TestCase):
         )
 
         orders = orders_small.difference(orders_big)
+        print(orders.query)
         data = sorted(
             (o.amount, o.region_id, o.region_total) for o in orders)
         self.assertEqual(data, [
