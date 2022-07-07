@@ -1,5 +1,9 @@
 # Django CTE change log
 
+## v1.2.1 - 2022-07-07
+
+- Fix compatibility with non-CTE models.
+
 ## v1.2.0 - 2022-03-30
 
 - Add support for Django 3.1, 3.2 and 4.0.
