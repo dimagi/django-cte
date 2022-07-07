@@ -45,11 +45,20 @@ class Region(Model):
         db_table = "region"
 
 
+class User(Model):
+    id = AutoField(primary_key=True)
+    name = TextField()
+
+    class Meta:
+        db_table = "user"
+
+
 class Order(Model):
     objects = CTEManager()
     id = AutoField(primary_key=True)
     region = ForeignKey(Region, on_delete=CASCADE)
     amount = IntegerField(default=0)
+    user = ForeignKey(User, null=True, on_delete=CASCADE)
 
     class Meta:
         db_table = "orders"

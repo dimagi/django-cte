@@ -13,8 +13,9 @@ from django.db.models.sql.constants import LOUTER
 from django.test import TestCase
 
 from django_cte import With
+from django_cte import CTEManager
 
-from .models import Order, Region
+from .models import Order, Region, User
 
 int_field = IntegerField()
 text_field = TextField()
@@ -440,4 +441,53 @@ class TestCTE(TestCase):
             ('venus', 21, None),
             ('venus', 22, None),
             ('venus', 23, None),
+        ])
+
+    def test_non_cte_subquery(self):
+        """
+        Verifies that subquery annotations are handled correctly when the
+        subquery model doesn't use the CTE manager, and the query results
+        match expected behavior
+        """
+        self.assertNotIsInstance(User.objects, CTEManager)
+
+        sub_totals = With(
+            Order.objects
+            .values(region_parent=F("region__parent_id"))
+            .annotate(
+                total=Sum("amount"),
+                # trivial subquery example testing existence of
+                # a user for the order
+                non_cte_subquery=Exists(
+                    User.objects.filter(pk=OuterRef("user_id"))
+                ),
+            ),
+        )
+        regions = (
+            Region.objects.all()
+            .with_cte(sub_totals)
+            .annotate(
+                child_regions_total=Subquery(
+                    sub_totals.queryset()
+                    .filter(region_parent=OuterRef("name"))
+                    .values("total"),
+                ),
+            )
+            .order_by("name")
+        )
+        print(regions.query)
+
+        data = [(r.name, r.child_regions_total) for r in regions]
+        self.assertEqual(data, [
+            ("bernard's star", None),
+            ('deimos', None),
+            ('earth', 6),
+            ('mars', None),
+            ('mercury', None),
+            ('moon', None),
+            ('phobos', None),
+            ('proxima centauri', 33),
+            ('proxima centauri b', None),
+            ('sun', 368),
+            ('venus', None)
         ])
