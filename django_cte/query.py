@@ -103,7 +103,7 @@ class CTECompiler(object):
             sql.extend(["WITH RECURSIVE", ", ".join(ctes)])
         base_sql, base_params = as_sql()
 
-        if explain_query is not None:
+        if explain_query:
             query.explain_query = explain_query
 
         sql.append(base_sql)
