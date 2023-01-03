@@ -86,9 +86,15 @@ class CTECompiler(object):
         if explain_query:
             explain_format = getattr(query, "explain_format", None)
             explain_options = getattr(query, "explain_options", {})
-            sql.append(connection.ops.explain_query_prefix(explain_format, **explain_options))
-            # this needs to get set to False so that the base as_sql() doesn't insert the EXPLAIN statement where it
-            # would end up between the WITH ... clause and the final SELECT
+            sql.append(
+                connection.ops.explain_query_prefix(
+                    explain_format,
+                    **explain_options
+                )
+            )
+            # this needs to get set to False so that the base as_sql() doesn't
+            # insert the EXPLAIN statement where it would end up between the
+            # WITH ... clause and the final SELECT
             query.explain_query = False
 
         if ctes:
@@ -97,7 +103,6 @@ class CTECompiler(object):
             sql.extend(["WITH RECURSIVE", ", ".join(ctes)])
         base_sql, base_params = as_sql()
 
-        # restore the explain_query value
         if explain_query is not None:
             query.explain_query = explain_query
 

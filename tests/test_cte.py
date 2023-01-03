@@ -494,7 +494,8 @@ class TestCTE(TestCase):
 
     def test_explain(self):
         """
-        Verifies that using .explain() prepends the EXPLAIN clause in the correct position
+        Verifies that using .explain() prepends the EXPLAIN clause in the
+        correct position
         """
 
         totals = With(
@@ -523,8 +524,8 @@ class TestCTE(TestCase):
             .order_by("amount")
         )
 
-        # the test db (sqlite3) doesn't support EXPLAIN, so let's just check to make sure EXPLAIN is at the top
+        # the test db (sqlite3) doesn't support EXPLAIN, so let's just check
+        # to make sure EXPLAIN is at the top
         orders.query.explain_query = True
 
         self.assertTrue(str(orders.query).startswith("EXPLAIN "))
-
