@@ -81,10 +81,31 @@ class CTECompiler(object):
             ctes.append(cls.TEMPLATE.format(name=qn(cte.name), query=cte_sql))
             params.extend(cte_params)
 
-        # Always use WITH RECURSIVE
-        # https://www.postgresql.org/message-id/13122.1339829536%40sss.pgh.pa.us
-        sql = ["WITH RECURSIVE", ", ".join(ctes)] if ctes else []
+        explain_query = getattr(query, "explain_query", None)
+        sql = []
+        if explain_query:
+            explain_format = getattr(query, "explain_format", None)
+            explain_options = getattr(query, "explain_options", {})
+            sql.append(
+                connection.ops.explain_query_prefix(
+                    explain_format,
+                    **explain_options
+                )
+            )
+            # this needs to get set to False so that the base as_sql() doesn't
+            # insert the EXPLAIN statement where it would end up between the
+            # WITH ... clause and the final SELECT
+            query.explain_query = False
+
+        if ctes:
+            # Always use WITH RECURSIVE
+            # https://www.postgresql.org/message-id/13122.1339829536%40sss.pgh.pa.us
+            sql.extend(["WITH RECURSIVE", ", ".join(ctes)])
         base_sql, base_params = as_sql()
+
+        if explain_query:
+            query.explain_query = explain_query
+
         sql.append(base_sql)
         params.extend(base_params)
         return " ".join(sql), tuple(params)

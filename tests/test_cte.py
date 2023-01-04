@@ -491,3 +491,41 @@ class TestCTE(TestCase):
             ('sun', 368),
             ('venus', None)
         ])
+
+    def test_explain(self):
+        """
+        Verifies that using .explain() prepends the EXPLAIN clause in the
+        correct position
+        """
+
+        totals = With(
+            Order.objects
+            .filter(region__parent="sun")
+            .values("region_id")
+            .annotate(total=Sum("amount")),
+            name="totals",
+        )
+        region_count = With(
+            Region.objects
+            .filter(parent="sun")
+            .values("parent")
+            .annotate(num=Count("name")),
+            name="region_count",
+        )
+        orders = (
+            region_count.join(
+                totals.join(Order, region=totals.col.region_id),
+                region__parent=region_count.col.parent_id
+            )
+            .with_cte(totals)
+            .with_cte(region_count)
+            .annotate(region_total=totals.col.total)
+            .annotate(region_count=region_count.col.num)
+            .order_by("amount")
+        )
+
+        # the test db (sqlite3) doesn't support EXPLAIN, so let's just check
+        # to make sure EXPLAIN is at the top
+        orders.query.explain_query = True
+
+        self.assertTrue(str(orders.query).startswith("EXPLAIN "))
