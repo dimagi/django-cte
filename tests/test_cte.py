@@ -295,6 +295,27 @@ class TestCTE(TestCase):
             ('sun', 18, 1374),
         ])
 
+    def test_materialized_option(self):
+        totals = With(
+            Order.objects
+            .filter(region__parent="sun")
+            .values("region_id")
+            .annotate(total=Sum("amount")),
+            materialized=True
+        )
+        orders = (
+            totals
+            .join(Order, region=totals.col.region_id)
+            .with_cte(totals)
+            .annotate(region_total=totals.col.total)
+            .order_by("amount")
+        )
+        self.assertTrue(
+            str(orders.query).startswith(
+                'WITH RECURSIVE "cte" AS MATERIALIZED'
+            )
+        )
+
     def test_update_cte_query(self):
         cte = With(
             Order.objects

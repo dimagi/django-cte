@@ -310,3 +310,15 @@ class TestRecursiveCTE(TestCase):
             list(c.key for c in children),
             ['level 2', 'level 2']
         )
+
+    def test_materialized(self):
+        # This test covers MATERIALIZED option in SQL query
+        def make_regions_cte(cte):
+            return KeyPair.objects.all()
+        cte = With.recursive(make_regions_cte, materialized=True)
+
+        query = KeyPair.objects.with_cte(cte)
+        print(query.query)
+        self.assertTrue(
+            str(query.query).startswith('WITH RECURSIVE "cte" AS MATERIALIZED')
+        )

@@ -415,6 +415,32 @@ Django automatically converts a `LEFT OUTER JOIN` to an `INNER JOIN` in the
 process of building the query. Be sure to test your queries to ensure they
 produce the desired SQL.
 
+## Materialized CTE
+
+Both PostgreSQL 12+ and sqlite 3.35+ supports `MATERIALIZED` keyword for CTE queries.
+To enforce using of this keyword add `materialized` as a parameter of `With(..., materialized=True)`.
+
+
+```py
+cte = With(
+    Order.objects.values('id'),
+    materialized=True
+)
+```
+
+Which produces this SQL:
+
+```sql
+WITH RECURSIVE "cte" AS MATERIALIZED (
+    SELECT 
+        "orders"."id"
+    FROM "orders"
+)
+...
+```
+
+
+
 
 ## Raw CTE SQL
 
