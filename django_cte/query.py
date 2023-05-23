@@ -1,8 +1,6 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-import warnings
-
 import django
 from django.db import connections
 from django.db.models.sql import DeleteQuery, Query, UpdateQuery
@@ -67,8 +65,6 @@ class CTEQuery(Query):
 
 class CTECompiler(object):
 
-    TEMPLATE = "{name} AS {materialized} ({query})"
-
     @classmethod
     def generate_sql(cls, connection, query, as_sql):
         if query.combinator:
@@ -80,12 +76,8 @@ class CTECompiler(object):
             compiler = cte.query.get_compiler(connection=connection)
             qn = compiler.quote_name_unless_alias
             cte_sql, cte_params = compiler.as_sql()
-            template_params = {
-                'name': qn(cte.name),
-                'materialized': cls.get_materialized_keyword(connection, cte),
-                'query': cte_sql
-            }
-            ctes.append(cls.TEMPLATE.format(**template_params))
+            template = cls.get_cte_query_template(cte)
+            ctes.append(template.format(name=qn(cte.name), query=cte_sql))
             params.extend(cte_params)
 
         explain_query = getattr(query, "explain_query", None)
@@ -118,30 +110,10 @@ class CTECompiler(object):
         return " ".join(sql), tuple(params)
 
     @classmethod
-    def is_materialized_keyword_supported(cls, connection):
-        return any(
-            (
-                (
-                    connection.vendor == 'postgresql'
-                    and connection.pg_version >= 120000
-                ),
-                (
-                    connection.vendor == 'sqlite'
-                ),
-            )
-        )
-
-    @classmethod
-    def get_materialized_keyword(cls, connection, cte):
+    def get_cte_query_template(cls, cte):
         if cte.materialized:
-            if cls.is_materialized_keyword_supported(connection):
-                return 'MATERIALIZED'
-            else:
-                warnings.warn(
-                    'MATERIALIZED statement does not supported by %s. '
-                    'Parameter will be skipped by %s.'
-                    % (connection.vendor, str(cte)))
-        return ''
+            return "{name} AS MATERIALIZED ({query})"
+        return "{name} AS ({query})"
 
 
 class CTEUpdateQuery(UpdateQuery, CTEQuery):
