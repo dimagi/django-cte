@@ -21,25 +21,28 @@ class With(object):
     entities (tables, views, functions, other CTE(s), etc.) referenced
     in the given query as well any query to which this CTE will
     eventually be added.
+    :param materialized: Optional parameter (default: False) which enforce
+    using of MATERIALIZED statement for supporting databases.
     """
 
-    def __init__(self, queryset, name="cte"):
+    def __init__(self, queryset, name="cte", materialized=False):
         self.query = None if queryset is None else queryset.query
         self.name = name
         self.col = CTEColumns(self)
+        self.materialized = materialized
 
     def __getstate__(self):
-        return (self.query, self.name)
+        return (self.query, self.name, self.materialized)
 
     def __setstate__(self, state):
-        self.query, self.name = state
+        self.query, self.name, self.materialized = state
         self.col = CTEColumns(self)
 
     def __repr__(self):
         return "<With {}>".format(self.name)
 
     @classmethod
-    def recursive(cls, make_cte_queryset, name="cte"):
+    def recursive(cls, make_cte_queryset, name="cte", materialized=False):
         """Recursive Common Table Expression: `WITH RECURSIVE ...`
 
         :param make_cte_queryset: Function taking a single argument (a
@@ -47,9 +50,10 @@ class With(object):
         object. The returned `QuerySet` normally consists of an initial
         statement unioned with a recursive statement.
         :param name: See `name` parameter of `__init__`.
+        :param materialized: See `materialized` parameter of `__init__`.
         :returns: The fully constructed recursive cte object.
         """
-        cte = cls(None, name)
+        cte = cls(None, name, materialized)
         cte.query = make_cte_queryset(cte).query
         return cte
 

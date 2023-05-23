@@ -65,8 +65,6 @@ class CTEQuery(Query):
 
 class CTECompiler(object):
 
-    TEMPLATE = "{name} AS ({query})"
-
     @classmethod
     def generate_sql(cls, connection, query, as_sql):
         if query.combinator:
@@ -78,7 +76,8 @@ class CTECompiler(object):
             compiler = cte.query.get_compiler(connection=connection)
             qn = compiler.quote_name_unless_alias
             cte_sql, cte_params = compiler.as_sql()
-            ctes.append(cls.TEMPLATE.format(name=qn(cte.name), query=cte_sql))
+            template = cls.get_cte_query_template(cte)
+            ctes.append(template.format(name=qn(cte.name), query=cte_sql))
             params.extend(cte_params)
 
         explain_query = getattr(query, "explain_query", None)
@@ -109,6 +108,12 @@ class CTECompiler(object):
         sql.append(base_sql)
         params.extend(base_params)
         return " ".join(sql), tuple(params)
+
+    @classmethod
+    def get_cte_query_template(cls, cte):
+        if cte.materialized:
+            return "{name} AS MATERIALIZED ({query})"
+        return "{name} AS ({query})"
 
 
 class CTEUpdateQuery(UpdateQuery, CTEQuery):
