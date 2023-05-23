@@ -24,7 +24,7 @@ jobs:
         - 'Django>=4.0,<4.1'
         experimental: [false]
         include:
-        - python: '3.9'
+        - python: '3.10'
           django: 'https://github.com/django/django/archive/refs/heads/main.zip#egg=Django'
           experimental: true
           # NOTE this job will appear to pass even when it fails because of
