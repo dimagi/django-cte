@@ -415,6 +415,7 @@ Django automatically converts a `LEFT OUTER JOIN` to an `INNER JOIN` in the
 process of building the query. Be sure to test your queries to ensure they
 produce the desired SQL.
 
+
 ## Materialized CTE
 
 Both PostgreSQL 12+ and sqlite 3.35+ supports `MATERIALIZED` keyword for CTE queries.
@@ -438,8 +439,6 @@ WITH RECURSIVE "cte" AS MATERIALIZED (
 )
 ...
 ```
-
-
 
 
 ## Raw CTE SQL
