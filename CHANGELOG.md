@@ -1,5 +1,10 @@
 # Django CTE change log
 
+## 1.3.0 - 2023-05-24
+
+- Add support for Materialized CTEs.
+- Fix: add EXPLAIN clause in correct position when using `.explain()` method.
+
 ## v1.2.1 - 2022-07-07
 
 - Fix compatibility with non-CTE models.
