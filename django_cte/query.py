@@ -125,6 +125,7 @@ class CTEDeleteQuery(DeleteQuery, CTEQuery):
 
 
 QUERY_TYPES = {
+    Query: CTEQuery,
     UpdateQuery: CTEUpdateQuery,
     DeleteQuery: CTEDeleteQuery,
 }
