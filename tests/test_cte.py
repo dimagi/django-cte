@@ -346,6 +346,22 @@ class TestCTE(TestCase):
             ('sun', 368),
         })
 
+    def test_update_with_subquery(self):
+        # Test for issue: https://github.com/dimagi/django-cte/issues/9
+        # Issue is not reproduces on sqlite3 use postgres to run.
+        # To reproduce the problem it's required to have some join
+        # in the select-query so the compiler will turn it into a subquery.
+        # To add a join use a filter over field of related model
+        orders = Order.objects.filter(region__parent_id='sun')
+        orders.update(amount=0)
+        data = {(order.region_id, order.amount) for order in orders}
+        self.assertEqual(data, {
+            ('mercury', 0),
+            ('venus', 0),
+            ('earth', 0),
+            ('mars', 0),
+        })
+
     def test_delete_cte_query(self):
         raise SkipTest(
             "this test will not work until `QuerySet.delete` (Django method) "
