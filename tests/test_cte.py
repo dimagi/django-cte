@@ -352,10 +352,15 @@ class TestCTE(TestCase):
         # To reproduce the problem it's required to have some join
         # in the select-query so the compiler will turn it into a subquery.
         # To add a join use a filter over field of related model
-        orders = Order.objects.filter(region__parent='sun')
+        orders = Order.objects.filter(region__parent_id='sun')
         orders.update(amount=0)
-        for order in orders:
-            assert order.amount == 0
+        data = {(order.region_id, order.amount) for order in orders}
+        self.assertEqual(data, {
+            ('mercury', 0),
+            ('venus', 0),
+            ('earth', 0),
+            ('mars', 0),
+        })
 
     def test_delete_cte_query(self):
         raise SkipTest(
