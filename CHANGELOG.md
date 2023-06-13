@@ -1,5 +1,10 @@
 # Django CTE change log
 
+## 1.3.1 - 2023-06-13
+
+- Fix: `.update()` did not work when using CTE manager or when accessing nested
+  tables.
+
 ## 1.3.0 - 2023-05-24
 
 - Add support for Materialized CTEs.
