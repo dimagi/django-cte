@@ -1,37 +1,14 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
-import sys
-
-from django.db import connection
-
-from .models import KeyPair, Region, Order
-
-is_initialized = False
+import pytest
 
 
-def init_db():
-    global is_initialized
-    if is_initialized:
-        return
-    is_initialized = True
-
-    # replace sys.stdout for prompt to delete database
-    old_stdout = sys.stdout
-    sys.stdout = sys.__stdout__
-    try:
-        connection.creation.create_test_db(verbosity=0)
-    finally:
-        sys.stdout = old_stdout
-
-    setup_data()
-
-
-def destroy_db():
-    connection.creation.destroy_test_db(verbosity=0)
+@pytest.fixture(scope='session')
+def django_db_setup(django_db_setup, django_db_blocker):
+    with django_db_blocker.unblock():
+        setup_data()
 
 
 def setup_data():
+    from .models import KeyPair, Region, Order
     regions = {None: None}
     for name, parent in [
         ("sun", None),

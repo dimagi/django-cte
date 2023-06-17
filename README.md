@@ -1,6 +1,6 @@
 # Common Table Expressions with Django
 
-[![Build Status](https://travis-ci.com/dimagi/django-cte.png)](https://travis-ci.com/dimagi/django-cte)
+[![Tests](https://github.com/dimagi/django-cte/actions/workflows/tests.yml/badge.svg)](https://github.com/dimagi/django-cte/actions/workflows/tests.yml)
 [![PyPI version](https://badge.fury.io/py/django-cte.svg)](https://badge.fury.io/py/django-cte)
 
 ## Installation
@@ -20,9 +20,9 @@ to use Common Table Expressions with the Django ORM.
 ```
 cd django-cte
 mkvirtualenv cte  # or however you choose to setup your environment
-pip install django nose flake8
+pip install django pytest-django flake8
 
-nosetests
+python -m pytest
 flake8 --config=setup.cfg
 ```
 
