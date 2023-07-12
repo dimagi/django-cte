@@ -20,7 +20,7 @@ to use Common Table Expressions with the Django ORM.
 ```
 cd django-cte
 mkvirtualenv cte  # or however you choose to setup your environment
-pip install django nose flake8
+pip install django pynose flake8
 
 nosetests
 flake8 --config=setup.cfg
