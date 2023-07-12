@@ -166,3 +166,7 @@ class CTEManager(Manager.from_queryset(CTEQuerySet)):
                 "models with CTE support need to use a CTEQuerySet")
         return super(CTEManager, cls).from_queryset(
             queryset_class, class_name=class_name)
+
+class CTEModelMixIn():
+    """Model MixIn to inherit from, that has the Manager installed as 'objects'"""
+    objects = CTEManager()
