@@ -76,4 +76,8 @@ jobs:
       run: tox
       continue-on-error: ${{ matrix.experimental }}
     - name: Check style
-      run: flake8 django_cte/ tests/
+      # flake8 3.8.3 needs importlib-metadata < 5
+      # https://github.com/python/importlib_metadata/issues/406
+      run: |
+        pip install importlib-metadata < 5
+        flake8 django_cte/ tests/
