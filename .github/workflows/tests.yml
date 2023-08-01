@@ -11,17 +11,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ['3.7', '3.8', '3.9']
-        # Time to switch to pytest or nose2?
-        # nosetests is broken on 3.10
-        # AttributeError: module 'collections' has no attribute 'Callable'
-        # https://github.com/nose-devs/nose/issues/1099
+        python: ['3.7', '3.8', '3.9', '3.10']
         django:
         - 'Django>=2.2,<3.0'
         - 'Django>=3.0,<3.1'
         - 'Django>=3.1,<3.2'
         - 'Django>=3.2,<3.3'
         - 'Django>=4.0,<4.1'
+        - 'Django>=4.1,<4.2'
         experimental: [false]
         include:
         - python: '3.10'
@@ -33,7 +30,9 @@ jobs:
           # https://github.com/actions/toolkit/issues/399
         exclude:
         - python: '3.7'
-          django: 'Django>=4.0,<4.1'
+          django:
+          - 'Django>=4.0,<4.1'
+          - 'Django>=4.1,<4.2'
     services:
       postgres:
         image: postgres:latest
@@ -53,12 +52,11 @@ jobs:
     - uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python }}
-    - name: Setup
+    - name: Install dependencies
       run: |
-        python --version
-        pip install --upgrade pip wheel
-        pip install "${{ matrix.django }}" psycopg2-binary nose flake8
-    - name: Run tests
+        python -m pip install --upgrade pip
+        pip install tox tox-gh-actions flake8
+    - name: Run Tox tests
       env:
         DB_SETTINGS: >-
           {
@@ -69,7 +67,7 @@ jobs:
             "HOST":"localhost",
             "PORT":"5432"
           }
-      run: nosetests
+      run: tox -e py
       continue-on-error: ${{ matrix.experimental }}
     - name: Check style
       run: flake8 django_cte/ tests/
