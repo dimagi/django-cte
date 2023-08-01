@@ -67,7 +67,8 @@ jobs:
             "HOST":"localhost",
             "PORT":"5432"
           }
-      run: tox -e py
+        PLATFORM: ${{ matrix.platform }}
+      run: tox
       continue-on-error: ${{ matrix.experimental }}
     - name: Check style
       run: flake8 django_cte/ tests/
