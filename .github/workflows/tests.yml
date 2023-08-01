@@ -67,7 +67,7 @@ jobs:
             "HOST":"localhost",
             "PORT":"5432"
           }
-        PLATFORM: ${{ matrix.platform }}
+        DJANGO: ${{ matrix.django }}
       run: tox
       continue-on-error: ${{ matrix.experimental }}
     - name: Check style
