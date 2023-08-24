@@ -346,12 +346,14 @@ Custom `QuerySet`s that will be used in CTE queries should be derived from
 `CTEQuerySet`.
 
 ```py
-class LargeOrdersQueySet(CTEQuerySet):
-    return self.filter(amount__gt=100)
+class LargeOrdersQuerySet(CTEQuerySet):
+    def big_amounts(self):
+        return self.filter(amount__gt=100)
 
 
 class Order(Model):
-    large = LargeOrdersQueySet.as_manager()
+    amount = models.IntegerField()
+    large = LargeOrdersQuerySet.as_manager()
 ```
 
 Custom `CTEQuerySet`s can also be used with custom `CTEManager`s.
@@ -362,7 +364,7 @@ class CustomManager(CTEManager):
 
 
 class Order(Model):
-    large = CustomManager.from_queryset(LargeOrdersQueySet)()
+    large = CustomManager.from_queryset(LargeOrdersQuerySet)()
     objects = CustomManager()
 ```
 
