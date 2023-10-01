@@ -23,13 +23,16 @@ class With(object):
     eventually be added.
     :param materialized: Optional parameter (default: False) which enforce
     using of MATERIALIZED statement for supporting databases.
+    :param base_manager: Optional parameter which is used to get the base
+    queryset via get_queryset in the queryset methond.
     """
 
-    def __init__(self, queryset, name="cte", materialized=False):
+    def __init__(self, queryset, name="cte", materialized=False, base_manager=None):
         self.query = None if queryset is None else queryset.query
         self.name = name
         self.col = CTEColumns(self)
         self.materialized = materialized
+        self.base_manager = base_manager
 
     def __getstate__(self):
         return (self.query, self.name, self.materialized)
@@ -104,7 +107,7 @@ class With(object):
         :returns: A queryset.
         """
         cte_query = self.query
-        qs = cte_query.model._default_manager.get_queryset()
+        qs = self.base_manager.get_queryset() if self.base_manager else cte_query.model._default_manager.get_queryset()
 
         query = CTEQuery(cte_query.model)
         query.join(BaseTable(self.name, None))
