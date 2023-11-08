@@ -11,24 +11,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ['3.8', '3.9']
-        # Time to switch to pytest or nose2?
-        # nosetests is broken on 3.10
-        # AttributeError: module 'collections' has no attribute 'Callable'
-        # https://github.com/nose-devs/nose/issues/1099
+        python: ['3.8', '3.9', '3.10', '3.11', '3.12']
         django:
         - 'Django>=3.2,<3.3'
         - 'Django>=4.1,<4.2'
         - 'Django>=4.2,<4.3'
-        experimental: [false]
-        include:
-        - python: '3.10'
-          django: 'https://github.com/django/django/archive/refs/heads/main.zip#egg=Django'
-          experimental: true
-          # NOTE this job will appear to pass even when it fails because of
-          # `continue-on-error: true`. Github Actions apparently does not
-          # have this feature, similar to Travis' allow-failure, yet.
-          # https://github.com/actions/toolkit/issues/399
     services:
       postgres:
         image: postgres:latest
@@ -52,7 +39,7 @@ jobs:
       run: |
         python --version
         pip install --upgrade pip wheel
-        pip install "${{ matrix.django }}" psycopg2-binary nose flake8
+        pip install "${{ matrix.django }}" psycopg2-binary pynose flake8
     - name: Run tests
       env:
         DB_SETTINGS: >-
@@ -64,7 +51,6 @@ jobs:
             "HOST":"localhost",
             "PORT":"5432"
           }
-      run: nosetests
-      continue-on-error: ${{ matrix.experimental }}
+      run: nosetests -v --capture_output
     - name: Check style
       run: flake8 django_cte/ tests/
