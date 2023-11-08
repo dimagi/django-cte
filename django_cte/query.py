@@ -136,6 +136,7 @@ class CTEQueryCompiler(SQLCompiler):
     def as_sql(self, *args, **kwargs):
         def _as_sql():
             return super(CTEQueryCompiler, self).as_sql(*args, **kwargs)
+        kwargs.pop("with_col_aliases", None)
         return CTECompiler.generate_sql(self.connection, self.query, _as_sql)
 
 
