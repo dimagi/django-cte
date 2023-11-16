@@ -1,5 +1,6 @@
 from unittest import SkipTest
 
+import django
 from django.db import OperationalError, ProgrammingError
 from django.db.models import Window
 from django.db.models.functions import Rank
@@ -54,6 +55,8 @@ class NonCteQueries(TestCase):
 class WindowFunctions(TestCase):
 
     def test_heterogeneous_filter_in_cte(self):
+        if django.VERSION < (4, 2):
+            raise SkipTest("feature added in Django 4.2")
         from django_cte import With
         cte = With(
             Order.objects.annotate(
