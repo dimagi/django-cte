@@ -1,6 +1,11 @@
+from unittest import SkipTest
+
+from django.db import OperationalError, ProgrammingError
+from django.db.models import Window
+from django.db.models.functions import Rank
 from django.test import TestCase, skipUnlessDBFeature
 
-from .models import Order, User
+from .models import Order, Region, User
 
 
 @skipUnlessDBFeature("supports_select_union")
@@ -44,3 +49,35 @@ class NonCteQueries(TestCase):
         qs1 = base_qs.filter(region_id="earth")
         qs2 = base_qs.filter(region_id="moon")
         self.assertEqual(qs1.union(qs2).first(), a1)
+
+
+class WindowFunctions(TestCase):
+
+    def test_heterogeneous_filter_in_cte(self):
+        from django_cte import With
+        cte = With(
+            Order.objects.annotate(
+                region_amount_rank=Window(
+                    Rank(), partition_by="region_id", order_by="-amount"
+                ),
+            )
+            .order_by("region_id")
+            .values("region_id", "region_amount_rank")
+            .filter(region_amount_rank=1, region_id__in=["sun", "moon"])
+        )
+        qs = cte.join(Region, name=cte.col.region_id).with_cte(cte)
+        print(qs.query)
+        # ProgrammingError: column cte.region_id does not exist
+        # WITH RECURSIVE "cte" AS (SELECT * FROM (
+        #   SELECT "orders"."region_id" AS "col1", ...
+        # "region" INNER JOIN "cte" ON "region"."name" = ("cte"."region_id")
+        try:
+            self.assertSequenceEqual({r.name for r in qs}, {"moon", "sun"})
+        except (OperationalError, ProgrammingError) as err:
+            if "cte.region_id" in str(err):
+                raise SkipTest(
+                    "window function auto-aliasing breaks CTE "
+                    "column references"
+                )
+            raise
+        assert 0, "unexpected pass"
