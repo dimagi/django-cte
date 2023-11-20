@@ -73,6 +73,8 @@ class CTECompiler(object):
         ctes = []
         params = []
         for cte in query._with_ctes:
+            if django.VERSION > (4, 2):
+                _ignore_with_col_aliases(cte.query)
             compiler = cte.query.get_compiler(connection=connection)
             qn = compiler.quote_name_unless_alias
             cte_sql, cte_params = compiler.as_sql()
@@ -131,12 +133,24 @@ QUERY_TYPES = {
 }
 
 
+def _ignore_with_col_aliases(cte_query):
+    if getattr(cte_query, "combined_queries", None):
+        for query in cte_query.combined_queries:
+            query.ignore_with_col_aliases = True
+
+
 class CTEQueryCompiler(SQLCompiler):
 
     def as_sql(self, *args, **kwargs):
         def _as_sql():
             return super(CTEQueryCompiler, self).as_sql(*args, **kwargs)
         return CTECompiler.generate_sql(self.connection, self.query, _as_sql)
+
+    def get_select(self, **kw):
+        if kw.get("with_col_aliases") \
+                and getattr(self.query, "ignore_with_col_aliases", False):
+            kw.pop("with_col_aliases")
+        return super().get_select(**kw)
 
 
 class CTEUpdateQueryCompiler(SQLUpdateCompiler):
