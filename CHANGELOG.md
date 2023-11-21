@@ -1,5 +1,12 @@
 # Django CTE change log
 
+## 1.3.2 - 2023-11-20
+
+- Work around changes in Django 4.2 that broke CTE queries due to internally
+  generated column aliases in the query compiler. The workaround is not always
+  effective. Some queries will produce mal-formed SQL. For example, CTE queries
+  with window functions.
+
 ## 1.3.1 - 2023-06-13
 
 - Fix: `.update()` did not work when using CTE manager or when accessing nested
