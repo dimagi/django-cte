@@ -1,6 +1,6 @@
 # Common Table Expressions with Django
 
-[![Build Status](https://travis-ci.com/dimagi/django-cte.png)](https://travis-ci.com/dimagi/django-cte)
+[![Build Status](https://github.com/dimagi/django-cte/actions/workflows/tests.yml/badge.svg)](https://github.com/dimagi/django-cte/actions/workflows/tests.yml)
 [![PyPI version](https://badge.fury.io/py/django-cte.svg)](https://badge.fury.io/py/django-cte)
 
 ## Installation
