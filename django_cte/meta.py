@@ -9,18 +9,44 @@ from django.db.models.expressions import Col, Expression
 class CTEColumns(object):
 
     def __init__(self, cte):
+        self._referenced = {}
         self._cte = weakref.ref(cte)
 
     def __getattr__(self, name):
-        return CTEColumn(self._cte(), name)
+        if name in self._referenced:
+            val = self._referenced[name]()
+            if val:
+                return val
+        col = CTEColumn(self._cte(), name, self)
+        self._referenced[name] = weakref.ref(col)
+        return col
+
+    def __getstate__(self):
+        state = {}
+        state["_cte"] = self._cte()
+        state["_referenced"] = [
+            tuple([name, val()])
+            for name, val in self._referenced.items()
+        ]
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__ = state.copy()
+        self.__dict__['_cte'] = weakref.ref(self.__dict__['_cte'])
+        self.__dict__['_referenced'] = {
+            name: weakref.ref(val)
+            for name, val in self.__dict__['_referenced']
+            if val
+        }
 
 
 class CTEColumn(Expression):
 
-    def __init__(self, cte, name, output_field=None):
+    def __init__(self, cte, name, container, output_field=None):
+        self._container = container
         self._cte = cte
-        self.table_alias = cte.name
-        self.name = self.alias = name
+        self._table_alias = cte.name
+        self.name = self._alias = name
         self._output_field = output_field
 
     def __repr__(self):
@@ -44,8 +70,22 @@ class CTEColumn(Expression):
         return ref
 
     @property
+    def table_alias(self):
+        if self._cte.query is None:
+            raise AttributeError
+        return self._cte.name
+
+    @property
     def target(self):
         return self._ref.target
+
+    @property
+    def alias(self):
+        return getattr(self._cte.col, self.name)._alias
+
+    @alias.setter
+    def alias(self, value):
+        getattr(self._cte.col, self.name)._alias = value
 
     @property
     def output_field(self):
@@ -64,7 +104,7 @@ class CTEColumn(Expression):
         if isinstance(ref, Col) and self.name == "pk":
             column = ref.target.column
         else:
-            column = self.name
+            column = self.alias
         return "%s.%s" % (qn(self.table_alias), qn(column)), []
 
     def relabeled_clone(self, relabels):

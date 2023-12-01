@@ -23,7 +23,7 @@ def raw_cte_sql(sql, params, refs):
         def __init__(self, connection):
             self.connection = connection
 
-        def as_sql(self):
+        def as_sql(self, *args, **kwargs):
             return sql, params
 
         def quote_name_unless_alias(self, name):
