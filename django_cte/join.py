@@ -15,11 +15,11 @@ class QJoin(object):
 
     filtered_relation = None
 
-    def __init__(self, parent_alias, table_name, table_alias,
+    def __init__(self, parent_alias, cte, table_alias,
                  on_clause, join_type=INNER, nullable=None):
+        self._cte = cte
         self.parent_alias = parent_alias
-        self.table_name = table_name
-        self.table_alias = table_alias
+        self._table_alias = table_alias
         self.on_clause = on_clause
         self.join_type = join_type  # LOUTER or INNER
         self.nullable = join_type != INNER if nullable is None else nullable
@@ -45,6 +45,21 @@ class QJoin(object):
     def equals(self, other):
         return self.identity == other.identity
 
+    @property
+    def table_alias(self):
+        return self._table_alias or self._cte.name
+
+    @table_alias.setter
+    def table_alias(self, value):
+        if value == self._cte.name:
+            self._table_alias = None
+        else:
+            self._table_alias = value
+
+    @property
+    def table_name(self):
+        return self._cte.name
+
     def as_sql(self, compiler, connection):
         """Generate join clause SQL"""
         on_clause_sql, params = self.on_clause.as_sql(compiler, connection)
@@ -64,7 +79,7 @@ class QJoin(object):
     def relabeled_clone(self, change_map):
         return self.__class__(
             parent_alias=change_map.get(self.parent_alias, self.parent_alias),
-            table_name=self.table_name,
+            cte=self._cte,
             table_alias=change_map.get(self.table_alias, self.table_alias),
             on_clause=self.on_clause.relabeled_clone(change_map),
             join_type=self.join_type,
