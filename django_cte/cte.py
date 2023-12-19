@@ -42,7 +42,7 @@ class With(object):
         return "<With {}>".format(self.name)
 
     @classmethod
-    def recursive(cls, make_cte_queryset, name="cte", materialized=False):
+    def recursive(cls, make_cte_queryset, name="cte", materialized=False, *args, **kwargs):
         """Recursive Common Table Expression: `WITH RECURSIVE ...`
 
         :param make_cte_queryset: Function taking a single argument (a
@@ -54,7 +54,7 @@ class With(object):
         :returns: The fully constructed recursive cte object.
         """
         cte = cls(None, name, materialized)
-        cte.query = make_cte_queryset(cte).query
+        cte.query = make_cte_queryset(cte, *args, **kwargs).query
         return cte
 
     def join(self, model_or_queryset, *filter_q, **filter_kw):
