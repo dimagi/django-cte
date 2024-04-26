@@ -109,6 +109,7 @@ class With(object):
         query = CTEQuery(cte_query.model)
         query.join(BaseTable(self.name, None))
         query.default_cols = cte_query.default_cols
+        query.deferred_loading = cte_query.deferred_loading
         if cte_query.annotations:
             for alias, value in cte_query.annotations.items():
                 col = CTEColumnRef(alias, self.name, value.output_field)
