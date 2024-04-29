@@ -104,3 +104,12 @@ class TestCTE(TestCase):
             ('venus', 22, 'sun'),
             ('venus', 23, 'sun'),
         ])
+
+    def test_cte_queryset_with_deferred_loading(self):
+        cte = With(
+            OrderCustomManagerNQuery.objects.order_by("id").only("id")[:1]
+        )
+        orders = cte.queryset().with_cte(cte)
+        print(orders.query)
+
+        self.assertEqual([x.id for x in orders], [1])
