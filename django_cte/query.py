@@ -82,21 +82,31 @@ class CTECompiler(object):
             ctes.append(template.format(name=qn(cte.name), query=cte_sql))
             params.extend(cte_params)
 
-        explain_query = getattr(query, "explain_query", None)
-        sql = []
-        if explain_query:
+        # Required due to breaking change in django commit
+        #     fc91ea1e50e5ef207f0f291b3f6c1942b10db7c7
+        if django.VERSION >= (4, 0):
+            explain_attribute = "explain_info"
+            explain_info = getattr(query, explain_attribute, None)
+            explain_format = getattr(explain_info, "format", None)
+            explain_options = getattr(explain_info, "options", {})
+        else:
+            explain_attribute = "explain_query"
             explain_format = getattr(query, "explain_format", None)
             explain_options = getattr(query, "explain_options", {})
+
+        explain_query_or_info = getattr(query, explain_attribute, None)
+        sql = []
+        if explain_query_or_info:
             sql.append(
                 connection.ops.explain_query_prefix(
                     explain_format,
                     **explain_options
                 )
             )
-            # this needs to get set to False so that the base as_sql() doesn't
+            # this needs to get set to None so that the base as_sql() doesn't
             # insert the EXPLAIN statement where it would end up between the
             # WITH ... clause and the final SELECT
-            query.explain_query = False
+            setattr(query, explain_attribute, None)
 
         if ctes:
             # Always use WITH RECURSIVE
@@ -104,8 +114,8 @@ class CTECompiler(object):
             sql.extend(["WITH RECURSIVE", ", ".join(ctes)])
         base_sql, base_params = as_sql()
 
-        if explain_query:
-            query.explain_query = explain_query
+        if explain_query_or_info:
+            setattr(query, explain_attribute, explain_query_or_info)
 
         sql.append(base_sql)
         params.extend(base_params)
