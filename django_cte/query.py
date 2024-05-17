@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import django
+from django.core.exceptions import EmptyResultSet
 from django.db import connections
 from django.db.models.sql import DeleteQuery, Query, UpdateQuery
 from django.db.models.sql.compiler import (
@@ -77,7 +78,14 @@ class CTECompiler(object):
                 _ignore_with_col_aliases(cte.query)
             compiler = cte.query.get_compiler(connection=connection)
             qn = compiler.quote_name_unless_alias
-            cte_sql, cte_params = compiler.as_sql()
+            try:
+                cte_sql, cte_params = compiler.as_sql()
+            except EmptyResultSet:
+                # If the CTE raises an EmptyResultSet the SqlCompiler still
+                # needs to know the information about this base compiler like,
+                # col_count and klass_info.
+                as_sql()
+                raise
             template = cls.get_cte_query_template(cte)
             ctes.append(template.format(name=qn(cte.name), query=cte_sql))
             params.extend(cte_params)

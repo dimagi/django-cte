@@ -562,3 +562,24 @@ class TestCTE(TestCase):
         )
 
         self.assertIsInstance(orders.explain(), str)
+
+    def test_empty_result_set_cte(self):
+        """
+        Verifies that the CTEQueryCompiler can handle empty result sets in the
+        related CTEs
+        """
+        totals = With(
+            Order.objects
+            .filter(id__in=[])
+            .values("region_id")
+            .annotate(total=Sum("amount")),
+            name="totals",
+        )
+        orders = (
+            totals.join(Order, region=totals.col.region_id)
+            .with_cte(totals)
+            .annotate(region_total=totals.col.total)
+            .order_by("amount")
+        )
+
+        self.assertEqual(len(orders), 0)
