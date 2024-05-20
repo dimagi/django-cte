@@ -583,3 +583,20 @@ class TestCTE(TestCase):
         )
 
         self.assertEqual(len(orders), 0)
+
+    def test_left_outer_join_on_empty_result_set_cte(self):
+        totals = With(
+            Order.objects
+            .filter(id__in=[])
+            .values("region_id")
+            .annotate(total=Sum("amount")),
+            name="totals",
+        )
+        orders = (
+            totals.join(Order, region=totals.col.region_id, _join_type=LOUTER)
+            .with_cte(totals)
+            .annotate(region_total=totals.col.total)
+            .order_by("amount")
+        )
+
+        self.assertEqual(len(orders), 22)

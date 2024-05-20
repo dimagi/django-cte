@@ -10,8 +10,10 @@ from django.db.models.sql.compiler import (
     SQLDeleteCompiler,
     SQLUpdateCompiler,
 )
+from django.db.models.sql.constants import LOUTER
 
 from .expressions import CTESubqueryResolver
+from .join import QJoin
 
 
 class CTEQuery(Query):
@@ -76,7 +78,13 @@ class CTECompiler(object):
         for cte in query._with_ctes:
             if django.VERSION > (4, 2):
                 _ignore_with_col_aliases(cte.query)
-            compiler = cte.query.get_compiler(connection=connection)
+
+            elide_empty = True
+            alias = query.alias_map.get(cte.name)
+            if isinstance(alias, QJoin) and alias.join_type == LOUTER:
+                elide_empty = False
+
+            compiler = cte.query.get_compiler(connection=connection, elide_empty=elide_empty)
             qn = compiler.quote_name_unless_alias
             try:
                 cte_sql, cte_params = compiler.as_sql()

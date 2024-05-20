@@ -32,7 +32,7 @@ def raw_cte_sql(sql, params, refs):
     class raw_cte_queryset(object):
         class query(object):
             @staticmethod
-            def get_compiler(connection):
+            def get_compiler(connection, *args, **kwargs):
                 return raw_cte_compiler(connection)
 
             @staticmethod
