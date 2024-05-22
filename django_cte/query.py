@@ -11,6 +11,7 @@ from django.db.models.sql.compiler import (
     SQLUpdateCompiler,
 )
 from django.db.models.sql.constants import LOUTER
+from django.db.models.sql.where import ExtraWhere, AND, WhereNode
 
 from .expressions import CTESubqueryResolver
 from .join import QJoin
@@ -79,21 +80,41 @@ class CTECompiler(object):
             if django.VERSION > (4, 2):
                 _ignore_with_col_aliases(cte.query)
 
-            elide_empty = True
             alias = query.alias_map.get(cte.name)
-            if isinstance(alias, QJoin) and alias.join_type == LOUTER:
-                elide_empty = False
+            is_left_outer = (
+                isinstance(alias, QJoin) and alias.join_type == LOUTER
+            )
 
-            compiler = cte.query.get_compiler(connection=connection, elide_empty=elide_empty)
+            if django.VERSION >= (4, 0):
+                compiler = cte.query.get_compiler(
+                    connection=connection, elide_empty=not is_left_outer
+                )
+            else:
+                compiler = cte.query.get_compiler(connection=connection)
+
             qn = compiler.quote_name_unless_alias
             try:
                 cte_sql, cte_params = compiler.as_sql()
             except EmptyResultSet:
-                # If the CTE raises an EmptyResultSet the SqlCompiler still
-                # needs to know the information about this base compiler like,
-                # col_count and klass_info.
-                as_sql()
-                raise
+                if django.VERSION < (4, 0) and is_left_outer:
+                    # elide_empty is not available prior to Django 4.0. The
+                    # below behavior emulates the logic of it, rebuilding
+                    # the CTE query with a WHERE clause that is always false
+                    # but that the SqlCompiler cannot optimize away. This is
+                    # only required for left outer joins, as standard inner
+                    # joins should be optimized and raise the EmptyResultSet
+                    query = cte.query.copy()
+                    query.where = WhereNode(
+                        [ExtraWhere(["1 = 0"], [])], AND
+                    )
+                    compiler = query.get_compiler(connection=connection)
+                    cte_sql, cte_params = compiler.as_sql()
+                else:
+                    # If the CTE raises an EmptyResultSet the SqlCompiler still
+                    # needs to know the information about this base compiler
+                    # like, col_count and klass_info.
+                    as_sql()
+                    raise
             template = cls.get_cte_query_template(cte)
             ctes.append(template.format(name=qn(cte.name), query=cte_sql))
             params.extend(cte_params)
