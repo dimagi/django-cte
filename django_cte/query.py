@@ -11,7 +11,7 @@ from django.db.models.sql.compiler import (
     SQLUpdateCompiler,
 )
 from django.db.models.sql.constants import LOUTER
-from django.db.models.sql.where import ExtraWhere, AND, WhereNode
+from django.db.models.sql.where import ExtraWhere, WhereNode
 
 from .expressions import CTESubqueryResolver
 from .join import QJoin
@@ -81,13 +81,13 @@ class CTECompiler(object):
                 _ignore_with_col_aliases(cte.query)
 
             alias = query.alias_map.get(cte.name)
-            is_left_outer = (
-                isinstance(alias, QJoin) and alias.join_type == LOUTER
+            should_elide_empty = (
+                    not isinstance(alias, QJoin) or alias.join_type != LOUTER
             )
 
             if django.VERSION >= (4, 0):
                 compiler = cte.query.get_compiler(
-                    connection=connection, elide_empty=not is_left_outer
+                    connection=connection, elide_empty=should_elide_empty
                 )
             else:
                 compiler = cte.query.get_compiler(connection=connection)
@@ -96,7 +96,7 @@ class CTECompiler(object):
             try:
                 cte_sql, cte_params = compiler.as_sql()
             except EmptyResultSet:
-                if django.VERSION < (4, 0) and is_left_outer:
+                if django.VERSION < (4, 0) and not should_elide_empty:
                     # elide_empty is not available prior to Django 4.0. The
                     # below behavior emulates the logic of it, rebuilding
                     # the CTE query with a WHERE clause that is always false
@@ -104,9 +104,7 @@ class CTECompiler(object):
                     # only required for left outer joins, as standard inner
                     # joins should be optimized and raise the EmptyResultSet
                     query = cte.query.copy()
-                    query.where = WhereNode(
-                        [ExtraWhere(["1 = 0"], [])], AND
-                    )
+                    query.where = WhereNode([ExtraWhere(["1 = 0"], [])])
                     compiler = query.get_compiler(connection=connection)
                     cte_sql, cte_params = compiler.as_sql()
                 else:
