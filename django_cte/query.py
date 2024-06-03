@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import django
+from django.core.exceptions import EmptyResultSet
 from django.db import connections
 from django.db.models.sql import DeleteQuery, Query, UpdateQuery
 from django.db.models.sql.compiler import (
@@ -9,8 +10,11 @@ from django.db.models.sql.compiler import (
     SQLDeleteCompiler,
     SQLUpdateCompiler,
 )
+from django.db.models.sql.constants import LOUTER
+from django.db.models.sql.where import ExtraWhere, WhereNode
 
 from .expressions import CTESubqueryResolver
+from .join import QJoin
 
 
 class CTEQuery(Query):
@@ -75,9 +79,40 @@ class CTECompiler(object):
         for cte in query._with_ctes:
             if django.VERSION > (4, 2):
                 _ignore_with_col_aliases(cte.query)
-            compiler = cte.query.get_compiler(connection=connection)
+
+            alias = query.alias_map.get(cte.name)
+            should_elide_empty = (
+                    not isinstance(alias, QJoin) or alias.join_type != LOUTER
+            )
+
+            if django.VERSION >= (4, 0):
+                compiler = cte.query.get_compiler(
+                    connection=connection, elide_empty=should_elide_empty
+                )
+            else:
+                compiler = cte.query.get_compiler(connection=connection)
+
             qn = compiler.quote_name_unless_alias
-            cte_sql, cte_params = compiler.as_sql()
+            try:
+                cte_sql, cte_params = compiler.as_sql()
+            except EmptyResultSet:
+                if django.VERSION < (4, 0) and not should_elide_empty:
+                    # elide_empty is not available prior to Django 4.0. The
+                    # below behavior emulates the logic of it, rebuilding
+                    # the CTE query with a WHERE clause that is always false
+                    # but that the SqlCompiler cannot optimize away. This is
+                    # only required for left outer joins, as standard inner
+                    # joins should be optimized and raise the EmptyResultSet
+                    query = cte.query.copy()
+                    query.where = WhereNode([ExtraWhere(["1 = 0"], [])])
+                    compiler = query.get_compiler(connection=connection)
+                    cte_sql, cte_params = compiler.as_sql()
+                else:
+                    # If the CTE raises an EmptyResultSet the SqlCompiler still
+                    # needs to know the information about this base compiler
+                    # like, col_count and klass_info.
+                    as_sql()
+                    raise
             template = cls.get_cte_query_template(cte)
             ctes.append(template.format(name=qn(cte.name), query=cte_sql))
             params.extend(cte_params)
