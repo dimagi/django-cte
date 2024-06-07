@@ -1,5 +1,11 @@
 # Django CTE change log
 
+## 1.3.3 - 2024-06-07
+
+- Handle empty result sets in CTEs ([#92](https://github.com/dimagi/django-cte/pull/92)).
+- Fix `.explain()` in Django >= 4.0 ([#91](https://github.com/dimagi/django-cte/pull/91)).
+- Fixed bug in deferred loading ([#90](https://github.com/dimagi/django-cte/pull/90)).
+
 ## 1.3.2 - 2023-11-20
 
 - Work around changes in Django 4.2 that broke CTE queries due to internally
