@@ -31,11 +31,12 @@ All feature and bug contributions are expected to be covered by tests.
 
 ## Uploading to PyPI
 
-Package and upload the generated files.
+Package and upload the generated files. This assumes the `django-cte` repository
+has been configured in `~/.pypirc`.
 
 ```
 pip install -r pkg-requires.txt
 
 python setup.py sdist bdist_wheel
-twine upload dist/*
+twine upload --repository=django-cte dist/*
 ```
