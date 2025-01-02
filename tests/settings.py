@@ -20,3 +20,4 @@ DATABASES = {'default': _db_settings}
 INSTALLED_APPS = ["tests"]
 
 SECRET_KEY = "test"
+USE_TZ = False
