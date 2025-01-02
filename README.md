@@ -19,10 +19,11 @@ to use Common Table Expressions with the Django ORM.
 
 ```
 cd django-cte
-mkvirtualenv cte  # or however you choose to setup your environment
-pip install django pynose flake8
+python -m venv .venv
+source .venv/bin/activate
+pip install django pytest-unmagic flake8
 
-nosetests
+pytest
 flake8 --config=setup.cfg
 ```
 
