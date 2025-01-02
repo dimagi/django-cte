@@ -1,7 +1,3 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
-from __future__ import print_function
 from django.db.models.expressions import F
 from django.db.models.query import QuerySet
 from django.test import TestCase

@@ -1,6 +1,3 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import os
 import json
 
@@ -20,3 +17,4 @@ DATABASES = {'default': _db_settings}
 INSTALLED_APPS = ["tests"]
 
 SECRET_KEY = "test"
+USE_TZ = False

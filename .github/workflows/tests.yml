@@ -4,6 +4,7 @@ on:
     branches: [master]
   pull_request:
     branches: [master]
+  workflow_dispatch:
 
 jobs:
   tests:
@@ -11,11 +12,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        python: ['3.9', '3.10', '3.11', '3.12', '3.13']
         django:
-        - 'Django>=3.2,<3.3'
-        - 'Django>=4.1,<4.2'
         - 'Django>=4.2,<4.3'
+        - 'Django>=5.0,<5.1'
+        - 'Django>=5.1,<5.2'
+        exclude:
+        - {python: '3.9', django: 'Django>=5.0,<5.1'}
+        - {python: '3.9', django: 'Django>=5.1,<5.2'}
     services:
       postgres:
         image: postgres:latest
@@ -39,7 +43,7 @@ jobs:
       run: |
         python --version
         pip install --upgrade pip wheel
-        pip install "${{ matrix.django }}" psycopg2-binary pynose flake8
+        pip install "${{ matrix.django }}" psycopg2-binary pytest-unmagic flake8
     - name: Run tests
       env:
         DB_SETTINGS: >-
@@ -51,6 +55,6 @@ jobs:
             "HOST":"localhost",
             "PORT":"5432"
           }
-      run: nosetests -v --capture_output
+      run: pytest -v
     - name: Check style
       run: flake8 django_cte/ tests/

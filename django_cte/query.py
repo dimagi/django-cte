@@ -1,6 +1,3 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import django
 from django.core.exceptions import EmptyResultSet
 from django.db import connections

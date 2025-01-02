@@ -1,6 +1,3 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 from django.db.models import Manager
 from django.db.models.query import Q, QuerySet, ValuesIterable
 from django.db.models.sql.datastructures import BaseTable

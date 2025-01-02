@@ -19,11 +19,26 @@ to use Common Table Expressions with the Django ORM.
 
 ```
 cd django-cte
-mkvirtualenv cte  # or however you choose to setup your environment
-pip install django pynose flake8
+python -m venv .venv
+source .venv/bin/activate
+pip install django pytest-unmagic flake8
 
-nosetests
+pytest
 flake8 --config=setup.cfg
+
+# To run tests against postgres
+pip install psycopg2-binary
+psql -U username -h localhost -p 5432 -c 'create database django_cte;'
+export PG_DB_SETTINGS='{
+    "ENGINE":"django.db.backends.postgresql_psycopg2",
+    "NAME":"django_cte",
+    "USER":"username",
+    "PASSWORD":"password",
+    "HOST":"localhost",
+    "PORT":"5432"}'
+
+# WARNING pytest will delete the test_django_cte database if it exists!
+DB_SETTINGS="$PG_DB_SETTINGS" pytest
 ```
 
 All feature and bug contributions are expected to be covered by tests.
