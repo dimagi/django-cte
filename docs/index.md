@@ -504,6 +504,6 @@ prevent SQL injection attacks.
 A few more advanced techniques as well as example query results can be found
 in the tests:
 
-- [`test_cte.py`](https://github.com/dimagi/django-cte/blob/master/tests/test_cte.py)
-- [`test_recursive.py`](https://github.com/dimagi/django-cte/blob/master/tests/test_recursive.py)
-- [`test_raw.py`](https://github.com/dimagi/django-cte/blob/master/tests/test_raw.py)
+- [`test_cte.py`](https://github.com/dimagi/django-cte/blob/main/tests/test_cte.py)
+- [`test_recursive.py`](https://github.com/dimagi/django-cte/blob/main/tests/test_recursive.py)
+- [`test_raw.py`](https://github.com/dimagi/django-cte/blob/main/tests/test_raw.py)
