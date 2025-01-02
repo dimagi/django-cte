@@ -42,8 +42,9 @@ jobs:
     - name: Setup
       run: |
         python --version
-        pip install --upgrade pip wheel
-        pip install "${{ matrix.django }}" psycopg2-binary pytest-unmagic flake8
+        pip install --upgrade pip
+        pip install "${{ matrix.django }}"
+        pip install -e .[test]
     - name: Run tests
       env:
         DB_SETTINGS: >-

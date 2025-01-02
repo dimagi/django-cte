@@ -21,13 +21,12 @@ to use Common Table Expressions with the Django ORM.
 cd django-cte
 python -m venv .venv
 source .venv/bin/activate
-pip install django pytest-unmagic flake8
+pip install -e .[test]
 
 pytest
 flake8 --config=setup.cfg
 
 # To run tests against postgres
-pip install psycopg2-binary
 psql -U username -h localhost -p 5432 -c 'create database django_cte;'
 export PG_DB_SETTINGS='{
     "ENGINE":"django.db.backends.postgresql_psycopg2",

@@ -1,0 +1,54 @@
+[project]
+name = "django-cte"
+description = "Common Table Expressions (CTE) for Django"
+authors = [{name = "Daniel Miller", email = "millerdev@gmail.com"}]
+license = {file = "LICENSE"}
+readme = {file = "README.md", content-type = "text/markdown"}
+dynamic = ["version"]
+requires-python = ">= 3.9"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    'Environment :: Web Environment',
+    'Framework :: Django',
+    'Intended Audience :: Developers',
+    'License :: OSI Approved :: BSD License',
+    'Operating System :: OS Independent',
+    'Programming Language :: Python',
+    'Programming Language :: Python :: 3',
+    'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12',
+    'Programming Language :: Python :: 3.13',
+    'Framework :: Django',
+    'Framework :: Django :: 4',
+    'Framework :: Django :: 4.2',
+    'Framework :: Django :: 5',
+    'Framework :: Django :: 5.0',
+    'Framework :: Django :: 5.1',
+    'Topic :: Software Development :: Libraries :: Python Modules',
+]
+dependencies = ["django"]
+
+[project.optional-dependencies]
+test = [
+    "flake8",
+    "psycopg2-binary",
+    "pytest-unmagic",
+]
+
+[project.urls]
+Home = "https://github.com/dimagi/django-cte"
+
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[tool.flit.module]
+name = "django_cte"
+
+[tool.distutils.bdist_wheel]
+universal = true
+
+[tool.flake8]
+exclude = "./build"
