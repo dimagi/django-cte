@@ -68,7 +68,7 @@ class CTECompiler(object):
 
     @classmethod
     def generate_sql(cls, connection, query, as_sql):
-        if query.combinator:
+        if not query._with_ctes:
             return as_sql()
 
         ctes = []
