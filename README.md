@@ -43,14 +43,12 @@ DB_SETTINGS="$PG_DB_SETTINGS" pytest
 All feature and bug contributions are expected to be covered by tests.
 
 
-## Uploading to PyPI
+## Publishing a new verison to PyPI
 
-Package and upload the generated files. This assumes the `django-cte` repository
-has been configured in `~/.pypirc`.
+Push a new tag to Github using the format vX.Y.Z where X.Y.Z matches the version
+in [`__init__.py`](django_cte/__init__.py).
 
-```
-pip install -r pkg-requires.txt
+A new version is published to https://test.pypi.org/p/django-cte on every
+push to the *main* branch.
 
-python setup.py sdist bdist_wheel
-twine upload --repository=django-cte dist/*
-```
+Publishing is automated with [Github Actions](.github/workflows/pypi.yml).
