@@ -1,6 +1,3 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import weakref
 
 from django.db.models.expressions import Col, Expression

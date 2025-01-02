@@ -1,7 +1,3 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
-
 def raw_cte_sql(sql, params, refs):
     """Raw CTE SQL
 
