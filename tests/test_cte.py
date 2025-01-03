@@ -596,3 +596,34 @@ class TestCTE(TestCase):
         )
 
         self.assertEqual(len(orders), 22)
+
+    def test_union_query_with_cte(self):
+        orders = (
+            Order.objects
+            .filter(region__parent="sun")
+            .only("region", "amount")
+        )
+        orders_cte = With(orders, name="orders_cte")
+        orders_cte_queryset = orders_cte.queryset()
+
+        earth_orders = orders_cte_queryset.filter(region="earth")
+        mars_orders = orders_cte_queryset.filter(region="mars")
+
+        earth_mars = earth_orders.union(mars_orders, all=True)
+        earth_mars_cte = (
+            earth_mars
+            .with_cte(orders_cte)
+            .order_by("region", "amount")
+            .values_list("region", "amount")
+        )
+        print(earth_mars_cte.query)
+
+        self.assertEqual(list(earth_mars_cte), [
+            ('earth', 30),
+            ('earth', 31),
+            ('earth', 32),
+            ('earth', 33),
+            ('mars', 40),
+            ('mars', 41),
+            ('mars', 42),
+        ])
