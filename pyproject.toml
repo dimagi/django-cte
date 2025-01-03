@@ -32,9 +32,9 @@ dependencies = ["django"]
 
 [project.optional-dependencies]
 test = [
-    "flake8",
     "psycopg2-binary",
     "pytest-unmagic",
+    "ruff",
 ]
 
 [project.urls]
@@ -49,6 +49,3 @@ name = "django_cte"
 
 [tool.distutils.bdist_wheel]
 universal = true
-
-[tool.flake8]
-exclude = "./build"

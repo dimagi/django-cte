@@ -58,4 +58,4 @@ jobs:
           }
       run: pytest -v
     - name: Check style
-      run: flake8 django_cte/ tests/
+      run: ruff check

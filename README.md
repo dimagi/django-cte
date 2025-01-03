@@ -24,7 +24,7 @@ source .venv/bin/activate
 pip install -e .[test]
 
 pytest
-flake8 --config=setup.cfg
+ruff check
 
 # To run tests against postgres
 psql -U username -h localhost -p 5432 -c 'create database django_cte;'
