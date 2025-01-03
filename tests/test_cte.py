@@ -604,7 +604,7 @@ class TestCTE(TestCase):
             .only("region", "amount")
         )
         orders_cte = With(orders, name="orders_cte")
-        orders_cte_queryset = orders_cte.queryset().only("region", "amount")
+        orders_cte_queryset = orders_cte.queryset()
 
         earth_orders = orders_cte_queryset.filter(region="earth")
         mars_orders = orders_cte_queryset.filter(region="mars")
