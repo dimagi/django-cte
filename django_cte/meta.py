@@ -16,7 +16,7 @@ class CTEColumn(Expression):
 
     def __init__(self, cte, name, output_field=None):
         self._cte = cte
-        self.table_alias = cte.name
+        self._table_alias = cte.name
         self.name = self.alias = name
         self._output_field = output_field
 
@@ -41,6 +41,12 @@ class CTEColumn(Expression):
         return ref
 
     @property
+    def table_alias(self):
+        if self._cte.query is None:
+            raise AttributeError
+        return self._cte.name
+
+    @property
     def target(self):
         return self._ref.target
 
@@ -63,13 +69,6 @@ class CTEColumn(Expression):
         else:
             column = self.name
         return "%s.%s" % (qn(self.table_alias), qn(column)), []
-
-    def relabeled_clone(self, relabels):
-        if self.table_alias is not None and self.table_alias in relabels:
-            clone = self.copy()
-            clone.table_alias = relabels[self.table_alias]
-            return clone
-        return self
 
 
 class CTEColumnRef(Expression):
