@@ -153,6 +153,17 @@ class CTEQuerySet(QuerySet):
     as_manager.queryset_only = True
     as_manager = classmethod(as_manager)
 
+    def _combinator_query(self, combinator, *other_qs, all=False):
+        clone = super(CTEQuerySet, self)._combinator_query(combinator, *other_qs, all=False)
+        if clone.query.combinator:
+            # Move CTE onto parent query, we can modify as they are cloned by super
+            sub_cte = []
+            for query in clone.query.combined_queries:
+                sub_cte.extend(query._with_ctes)
+                query._with_ctes=[]
+            clone.query._with_ctes = sub_cte
+        return clone
+
 
 class CTEManager(Manager.from_queryset(CTEQuerySet)):
     """Manager for models that perform CTE queries"""
