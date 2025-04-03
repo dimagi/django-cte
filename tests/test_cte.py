@@ -654,13 +654,11 @@ class TestCTE(TestCase):
             return Region.objects.filter(
                 parent_id=origin_node_pk
             ).values(
-                lid=F('parent_id'),
                 rid=F('name'),
             ).union(
                 leaf_cte.join(
                     Region, parent=leaf_cte.col.rid
                 ).values(
-                    lid=F('parent_id'),
                     rid=F('name'),
                 ).distinct(),
                 all=False
@@ -677,8 +675,7 @@ class TestCTE(TestCase):
                 .filter(linked=False)
         )
         leaf_cte = With.recursive(make_root_mapping, name="leaf_cte")
-
-        all_leaf_nodes = (
+        non_self_leaf_nodes = (
             leaf_cte.join(Region, pk=leaf_cte.col.rid)
             .with_cte(leaf_cte)
             .annotate(
@@ -687,8 +684,8 @@ class TestCTE(TestCase):
                 )
             )
             .filter(linked=False)
-            .union(self_leaf_node)
         )
+        all_leaf_nodes = non_self_leaf_nodes.union(self_leaf_node).order_by('name')
         print(all_leaf_nodes.query)
         self.assertEqual(
             list(all_leaf_nodes.values_list('name')),
