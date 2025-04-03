@@ -627,3 +627,57 @@ class TestCTE(TestCase):
             ('mars', 41),
             ('mars', 42),
         ])
+
+    def test_recursive_union_query_with_cte(self):
+        origin_node_pk = Region.objects.get(name='sun').pk
+
+        def make_root_mapping(leaf_cte):
+            return Region.objects.filter(
+                parent_id=origin_node_pk
+            ).values(
+                lid=F('parent_id'),
+                rid=F('name'),
+            ).union(
+                leaf_cte.join(
+                    Region, parent=leaf_cte.col.rid
+                ).values(
+                    lid=F('parent_id'),
+                    rid=F('name'),
+                ).distinct(),
+                all=False
+            )
+
+        self_leaf_node = (  # Find leaf origin nodes
+            Region.objects.filter(pk=origin_node_pk)
+                .annotate(
+                    linked=Exists(
+                        Region.objects.filter(
+                            parent_id = OuterRef('pk'))
+                    )
+                )
+                .filter(linked=False)
+        )
+        leaf_cte = With.recursive(make_root_mapping, name="leaf_cte")
+
+        all_leaf_nodes = (
+            leaf_cte.join(Region, pk=leaf_cte.col.rid)
+            .with_cte(leaf_cte)
+            .annotate(
+                linked=Exists(
+                    Region.objects.filter(parent_id=OuterRef('pk'))
+                )
+            )
+            .filter(linked=False)
+            .union(self_leaf_node)
+        )
+        print(all_leaf_nodes.query)
+        self.assertEqual(
+            list(all_leaf_nodes.values_list('name')),
+            [
+                ('deimos',),
+                ('mercury',),
+                ('moon',),
+                ('phobos',),
+                ('venus',)
+            ]
+        )
