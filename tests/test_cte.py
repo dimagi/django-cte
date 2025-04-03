@@ -597,6 +597,25 @@ class TestCTE(TestCase):
 
         self.assertEqual(len(orders), 22)
 
+    def test_union_query_with_no_ctes(self):
+        query_partA = Order.objects.filter(region__name="earth")
+        query_partB = Order.objects.filter(region__name="mars")
+        query_combined = (
+            query_partA.union(query_partB)
+            .order_by('region__name', 'amount')
+            .values_list('region__name', 'amount')
+        )
+        print(query_combined.query)
+        self.assertEqual(list(query_combined), [
+            ('earth', 30),
+            ('earth', 31),
+            ('earth', 32),
+            ('earth', 33),
+            ('mars', 40),
+            ('mars', 41),
+            ('mars', 42),
+        ])
+
     def test_union_query_with_cte(self):
         orders = (
             Order.objects
