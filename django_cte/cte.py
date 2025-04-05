@@ -1,4 +1,6 @@
+import django
 from django.db.models import Manager
+from django.db.models.expressions import Ref
 from django.db.models.query import Q, QuerySet, ValuesIterable
 from django.db.models.sql.datastructures import BaseTable
 
@@ -107,19 +109,27 @@ class With(object):
         query.join(BaseTable(self.name, None))
         query.default_cols = cte_query.default_cols
         query.deferred_loading = cte_query.deferred_loading
+        if cte_query.values_select:
+            query.set_values(cte_query.values_select)
+            qs._iterable_class = ValuesIterable
         if cte_query.annotations:
             for alias, value in cte_query.annotations.items():
                 col = CTEColumnRef(alias, self.name, value.output_field)
                 query.add_annotation(col, alias)
-        if cte_query.values_select:
-            query.set_values(cte_query.values_select)
-            qs._iterable_class = ValuesIterable
         query.annotation_select_mask = cte_query.annotation_select_mask
 
         qs.query = query
         return qs
 
     def _resolve_ref(self, name):
+        if (
+            django.VERSION >= (5, 2)
+            and isinstance(self.query, CTEQuery)
+            and name not in self.query.annotations
+            and self.query.has_select_fields
+            and name in self.query.selected
+        ):
+            return Ref(name, self.query)
         return self.query.resolve_ref(name)
 
 

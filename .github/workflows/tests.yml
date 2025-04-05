@@ -17,9 +17,11 @@ jobs:
         - 'Django>=4.2,<4.3'
         - 'Django>=5.0,<5.1'
         - 'Django>=5.1,<5.2'
+        - 'Django>=5.2,<5.3'
         exclude:
         - {python: '3.9', django: 'Django>=5.0,<5.1'}
         - {python: '3.9', django: 'Django>=5.1,<5.2'}
+        - {python: '3.9', django: 'Django>=5.2,<5.3'}
     services:
       postgres:
         image: postgres:latest

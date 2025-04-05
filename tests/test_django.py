@@ -83,4 +83,5 @@ class WindowFunctions(TestCase):
                     "column references"
                 )
             raise
-        assert 0, "unexpected pass"
+        if django.VERSION < (5, 2):
+            assert 0, "unexpected pass"
