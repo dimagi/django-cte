@@ -112,6 +112,15 @@ class With(object):
         if cte_query.values_select:
             query.set_values(cte_query.values_select)
             qs._iterable_class = ValuesIterable
+            if django.VERSION >= (5, 2):
+                for alias in cte_query.values_select:
+                    if (
+                        alias not in cte_query.annotations
+                        and cte_query.has_select_fields
+                        and alias in cte_query.selected
+                    ):
+                        col = CTEColumnRef(alias, self.name, cte_query.resolve_ref(alias).output_field)
+                        query.add_annotation(col, alias)
         if cte_query.annotations:
             for alias, value in cte_query.annotations.items():
                 col = CTEColumnRef(alias, self.name, value.output_field)
