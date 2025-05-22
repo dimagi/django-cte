@@ -18,10 +18,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.x"
-      - run: pip install build
+      - run: pip install build pyverno
       - name: Add untagged version suffix
         if: ${{ ! startsWith(github.ref, 'refs/tags/v') }}
-        run: python version.py update
+        run: python -m pyverno update django_cte/__init__.py
       - name: Build a binary wheel and a source tarball
         run: python -m build
       - name: Store the distribution packages
@@ -40,9 +40,9 @@ jobs:
         with:
           python-version: "3.x"
       - name: Install django-cte
-        run: pip install -e .
+        run: pip install pyverno -e .
       - name: Check version
-        run: python version.py check "${{ github.ref }}"
+        run: python -m pyverno check django_cte/__init__.py "${{ github.ref }}"
   pypi-publish:
     name: Upload release to PyPI
     needs: [build, version-check]
