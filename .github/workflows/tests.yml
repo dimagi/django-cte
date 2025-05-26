@@ -75,4 +75,4 @@ jobs:
           }
       run: .venv/bin/pytest -v
     - name: Check style
-      run: ruff check
+      run: .venv/bin/ruff check
