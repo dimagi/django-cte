@@ -54,15 +54,14 @@ jobs:
           --health-retries 5
     steps:
     - uses: actions/checkout@v3
-    - uses: actions/setup-python@v4
+    - uses: astral-sh/setup-uv@v6
       with:
+        version: '>=0.7'
         python-version: ${{ matrix.python }}
     - name: Setup
       run: |
-        python --version
-        pip install --upgrade pip
-        pip install "${{ matrix.django }}"
-        pip install -e .[test]
+        uv sync --locked --no-install-package=django
+        uv pip install "${{ matrix.django }}"
     - name: Run tests
       env:
         DB_SETTINGS: >-
@@ -74,6 +73,6 @@ jobs:
             "HOST":"localhost",
             "PORT":"5432"
           }
-      run: pytest -v
+      run: .venv/bin/pytest -v
     - name: Check style
       run: ruff check

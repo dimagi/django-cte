@@ -30,8 +30,8 @@ classifiers = [
 ]
 dependencies = ["django"]
 
-[project.optional-dependencies]
-test = [
+[dependency-groups]
+dev = [
     "psycopg2-binary",
     "pytest-unmagic",
     "ruff",
