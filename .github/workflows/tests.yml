@@ -7,12 +7,30 @@ on:
   workflow_dispatch:
 
 jobs:
+  configure:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Read Python versions from pyproject.toml
+      id: read-versions
+      # produces output like: python_versions=[ "3.9", "3.10", "3.11", "3.12" ]
+      run: >-
+        echo "python_versions=$(
+        grep -oP '(?<=Language :: Python :: )\d\.\d+' pyproject.toml
+        | jq --raw-input .
+        | jq --slurp .
+        | tr '\n' ' '
+        )" >> $GITHUB_OUTPUT
+    outputs:
+      python_versions: ${{ steps.read-versions.outputs.python_versions }}
+
   tests:
+    needs: [configure]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python: ['3.9', '3.10', '3.11', '3.12', '3.13']
+        python: ${{ fromJSON(needs.configure.outputs.python_versions) }}
         django:
         - 'Django>=4.2,<4.3'
         - 'Django>=5.0,<5.1'
@@ -36,15 +54,14 @@ jobs:
           --health-retries 5
     steps:
     - uses: actions/checkout@v3
-    - uses: actions/setup-python@v4
+    - uses: astral-sh/setup-uv@v6
       with:
+        version: '>=0.7'
         python-version: ${{ matrix.python }}
     - name: Setup
       run: |
-        python --version
-        pip install --upgrade pip
-        pip install "${{ matrix.django }}"
-        pip install -e .[test]
+        uv sync --locked --no-install-package=django
+        uv pip install "${{ matrix.django }}"
     - name: Run tests
       env:
         DB_SETTINGS: >-
@@ -56,6 +73,6 @@ jobs:
             "HOST":"localhost",
             "PORT":"5432"
           }
-      run: pytest -v
+      run: .venv/bin/pytest -v
     - name: Check style
-      run: ruff check
+      run: .venv/bin/ruff check

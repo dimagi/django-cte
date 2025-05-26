@@ -14,16 +14,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v6
         with:
-          python-version: "3.x"
-      - run: pip install build
+          version: '>=0.7'
       - name: Add untagged version suffix
         if: ${{ ! startsWith(github.ref, 'refs/tags/v') }}
-        run: python version.py update
+        run: uvx pyverno update django_cte/__init__.py
       - name: Build a binary wheel and a source tarball
-        run: python -m build
+        run: uv build
       - name: Store the distribution packages
         uses: actions/upload-artifact@v4
         with:
@@ -35,19 +33,15 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v6
         with:
-          python-version: "3.x"
-      - name: Install django-cte
-        run: pip install -e .
+          version: '>=0.7'
       - name: Check version
-        run: python version.py check "${{ github.ref }}"
+        run: uvx pyverno check django_cte/__init__.py "${{ github.ref }}"
   pypi-publish:
     name: Upload release to PyPI
     needs: [build, version-check]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
     environment:
       name: pypi
       url: https://pypi.org/p/django-cte

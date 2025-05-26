@@ -19,9 +19,7 @@ to use Common Table Expressions with the Django ORM.
 
 ```
 cd django-cte
-python -m venv .venv
-source .venv/bin/activate
-pip install -e .[test]
+uv sync
 
 pytest
 ruff check
