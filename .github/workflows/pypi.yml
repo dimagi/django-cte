@@ -17,6 +17,9 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           version: '>=0.7'
+      - name: Check for version match in git tag and django_cte.__version__
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: uvx pyverno check django_cte/__init__.py "${{ github.ref }}"
       - name: Add untagged version suffix
         if: ${{ ! startsWith(github.ref, 'refs/tags/v') }}
         run: uvx pyverno update django_cte/__init__.py
@@ -27,20 +30,9 @@ jobs:
         with:
           name: python-package-distributions
           path: dist/
-  version-check:
-    name: Check for version match in git tag and django_cte.__version__
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
-        with:
-          version: '>=0.7'
-      - name: Check version
-        run: uvx pyverno check django_cte/__init__.py "${{ github.ref }}"
   pypi-publish:
     name: Upload release to PyPI
-    needs: [build, version-check]
+    needs: [build]
     runs-on: ubuntu-latest
     environment:
       name: pypi
