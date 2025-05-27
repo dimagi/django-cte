@@ -1,5 +1,6 @@
 from django.db.models import (
     CASCADE,
+    Manager,
     Model,
     AutoField,
     CharField,
@@ -83,6 +84,12 @@ class OrderCustomManager(Order):
     class Meta:
         proxy = True
     objects = LTManager()
+
+
+class OrderPlainManager(Order):
+    class Meta:
+        proxy = True
+    objects = Manager()
 
 
 class KeyPair(Model):

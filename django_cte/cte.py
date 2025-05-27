@@ -153,6 +153,35 @@ class CTEQuerySet(QuerySet):
     as_manager.queryset_only = True
     as_manager = classmethod(as_manager)
 
+    def _combinator_query(self, *args, **kw):
+        clone = super()._combinator_query(*args, **kw)
+        if clone.query.combinator:
+            ctes = clone.query._with_ctes = []
+            seen = {}
+            for query in clone.query.combined_queries:
+                for cte in getattr(query, "_with_ctes", []):
+                    if seen.get(cte.name) is cte:
+                        continue
+                    if cte.name in seen:
+                        raise ValueError(
+                            f"Found two or more CTEs named '{cte.name}'. "
+                            "Hint: assign a unique name to each CTE."
+                        )
+                    ctes.append(cte)
+                    seen[cte.name] = cte
+            if ctes:
+                def without_ctes(query):
+                    if getattr(query, "_with_ctes", None):
+                        query = query.clone()
+                        query._with_ctes = []
+                    return query
+
+                clone.query.combined_queries = [
+                    without_ctes(query)
+                    for query in clone.query.combined_queries
+                ]
+        return clone
+
 
 class CTEManager(Manager.from_queryset(CTEQuerySet)):
     """Manager for models that perform CTE queries"""
