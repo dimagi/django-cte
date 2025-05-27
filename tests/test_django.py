@@ -6,6 +6,8 @@ from django.db.models import Window
 from django.db.models.functions import Rank
 from django.test import TestCase, skipUnlessDBFeature
 
+from django_cte import With
+
 from .models import Order, Region, User
 
 
@@ -54,10 +56,13 @@ class NonCteQueries(TestCase):
 
 class WindowFunctions(TestCase):
 
-    def test_heterogeneous_filter_in_cte(self):
+    @classmethod
+    def setUpClass(cls):
         if django.VERSION < (4, 2):
-            raise SkipTest("feature added in Django 4.2")
-        from django_cte import With
+            raise SkipTest("window functions were added in Django 4.2")
+        super().setUpClass()
+
+    def test_heterogeneous_filter_in_cte(self):
         cte = With(
             Order.objects.annotate(
                 region_amount_rank=Window(
