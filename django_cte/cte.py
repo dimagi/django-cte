@@ -107,13 +107,13 @@ class With(object):
         query.join(BaseTable(self.name, None))
         query.default_cols = cte_query.default_cols
         query.deferred_loading = cte_query.deferred_loading
+        if cte_query.values_select:
+            query.set_values(cte_query.values_select)
+            qs._iterable_class = ValuesIterable
         if cte_query.annotations:
             for alias, value in cte_query.annotations.items():
                 col = CTEColumnRef(alias, self.name, value.output_field)
                 query.add_annotation(col, alias)
-        if cte_query.values_select:
-            query.set_values(cte_query.values_select)
-            qs._iterable_class = ValuesIterable
         query.annotation_select_mask = cte_query.annotation_select_mask
 
         qs.query = query
