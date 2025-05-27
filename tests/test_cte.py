@@ -203,7 +203,7 @@ class TestCTE(TestCase):
         region_count = With(
             Region.objects
             .filter(parent="sun")
-            .values("parent")
+            .values("parent_id")
             .annotate(num=Count("name")),
             name="region_count",
         )
@@ -541,7 +541,7 @@ class TestCTE(TestCase):
         region_count = With(
             Region.objects
             .filter(parent="sun")
-            .values("parent")
+            .values("parent_id")
             .annotate(num=Count("name")),
             name="region_count",
         )
@@ -556,6 +556,7 @@ class TestCTE(TestCase):
             .annotate(region_count=region_count.col.num)
             .order_by("amount")
         )
+        print(orders.query)
 
         self.assertIsInstance(orders.explain(), str)
 
