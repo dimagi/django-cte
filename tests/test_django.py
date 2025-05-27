@@ -2,8 +2,8 @@ from unittest import SkipTest
 
 import django
 from django.db import OperationalError, ProgrammingError
-from django.db.models import Window
-from django.db.models.functions import Rank
+from django.db.models import F, Window
+from django.db.models.functions import Rank, RowNumber
 from django.test import TestCase, skipUnlessDBFeature
 
 from django_cte import With
@@ -89,3 +89,17 @@ class WindowFunctions(TestCase):
                 )
             raise
         assert 0, "unexpected pass"
+
+    def test_window_function_in_cte(self):
+        cte = With(
+            Region.objects.annotate(row_number=Window(RowNumber()))
+        )
+        qs = (
+            cte.queryset()
+            .annotate(rn2=Window(RowNumber(), order_by=[F("row_number")]))
+            .filter(rn2=1)
+            .with_cte(cte)
+        )
+        print(qs.query)
+        self.assertEqual({r.name for r in qs}, {"sun"})
+        self.assertEqual(str(qs.query).count("WITH "), 1)
