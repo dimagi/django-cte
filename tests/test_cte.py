@@ -628,3 +628,15 @@ class TestCTE(TestCase):
             ('mars', 41),
             ('mars', 42),
         ])
+
+    def test_cte_select_pk(self):
+        orders = Order.objects.filter(region="earth").values("pk")
+        cte = With(orders)
+        queryset = cte.join(orders, pk=cte.col.pk).with_cte(cte).order_by("pk")
+        print(queryset.query)
+        self.assertEqual(list(queryset), [
+            {'pk': 9},
+            {'pk': 10},
+            {'pk': 11},
+            {'pk': 12},
+        ])

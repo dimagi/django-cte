@@ -1,4 +1,5 @@
 from django.db.models import Manager
+from django.db.models.expressions import Ref
 from django.db.models.query import Q, QuerySet, ValuesIterable
 from django.db.models.sql.datastructures import BaseTable
 
@@ -125,6 +126,9 @@ class With(object):
         return qs
 
     def _resolve_ref(self, name):
+        selected = getattr(self.query, "selected", None)
+        if selected and name in selected and name not in self.query.annotations:
+            return Ref(name, self.query)
         return self.query.resolve_ref(name)
 
 
