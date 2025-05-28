@@ -1,4 +1,3 @@
-import django
 from django.db.models import Subquery
 
 
@@ -31,12 +30,8 @@ class CTESubqueryResolver(object):
 
         # --- end copied code --- #
 
-        if django.VERSION < (3, 0):
-            def get_query(clone):
-                return clone.queryset.query
-        else:
-            def get_query(clone):
-                return clone.query
+        def get_query(clone):
+            return clone.query
 
         # NOTE this uses the old (pre-Django 3) way of resolving.
         # Should a different technique should be used on Django 3+?

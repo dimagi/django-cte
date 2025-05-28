@@ -8,7 +8,6 @@ from django.db.models.sql.compiler import (
     SQLUpdateCompiler,
 )
 from django.db.models.sql.constants import LOUTER
-from django.db.models.sql.where import ExtraWhere, WhereNode
 
 from .expressions import CTESubqueryResolver
 from .join import QJoin
@@ -55,13 +54,8 @@ class CTEQuery(Query):
         clone._with_ctes = self._with_ctes[:]
         return clone
 
-    if django.VERSION < (2, 0):
-        def clone(self, klass=None, *args, **kwargs):
-            return self.__chain("clone", klass, *args, **kwargs)
-
-    else:
-        def chain(self, klass=None):
-            return self.__chain("chain", klass)
+    def chain(self, klass=None):
+        return self.__chain("chain", klass)
 
 
 class CTECompiler(object):
@@ -82,49 +76,27 @@ class CTECompiler(object):
                     not isinstance(alias, QJoin) or alias.join_type != LOUTER
             )
 
-            if django.VERSION >= (4, 0):
-                compiler = cte.query.get_compiler(
-                    connection=connection, elide_empty=should_elide_empty
-                )
-            else:
-                compiler = cte.query.get_compiler(connection=connection)
+            compiler = cte.query.get_compiler(
+                connection=connection, elide_empty=should_elide_empty
+            )
 
             qn = compiler.quote_name_unless_alias
             try:
                 cte_sql, cte_params = compiler.as_sql()
             except EmptyResultSet:
-                if django.VERSION < (4, 0) and not should_elide_empty:
-                    # elide_empty is not available prior to Django 4.0. The
-                    # below behavior emulates the logic of it, rebuilding
-                    # the CTE query with a WHERE clause that is always false
-                    # but that the SqlCompiler cannot optimize away. This is
-                    # only required for left outer joins, as standard inner
-                    # joins should be optimized and raise the EmptyResultSet
-                    query = cte.query.copy()
-                    query.where = WhereNode([ExtraWhere(["1 = 0"], [])])
-                    compiler = query.get_compiler(connection=connection)
-                    cte_sql, cte_params = compiler.as_sql()
-                else:
-                    # If the CTE raises an EmptyResultSet the SqlCompiler still
-                    # needs to know the information about this base compiler
-                    # like, col_count and klass_info.
-                    as_sql()
-                    raise
+                # If the CTE raises an EmptyResultSet the SqlCompiler still
+                # needs to know the information about this base compiler
+                # like, col_count and klass_info.
+                as_sql()
+                raise
             template = cls.get_cte_query_template(cte)
             ctes.append(template.format(name=qn(cte.name), query=cte_sql))
             params.extend(cte_params)
 
-        # Required due to breaking change in django commit
-        #     fc91ea1e50e5ef207f0f291b3f6c1942b10db7c7
-        if django.VERSION >= (4, 0):
-            explain_attribute = "explain_info"
-            explain_info = getattr(query, explain_attribute, None)
-            explain_format = getattr(explain_info, "format", None)
-            explain_options = getattr(explain_info, "options", {})
-        else:
-            explain_attribute = "explain_query"
-            explain_format = getattr(query, "explain_format", None)
-            explain_options = getattr(query, "explain_options", {})
+        explain_attribute = "explain_info"
+        explain_info = getattr(query, explain_attribute, None)
+        explain_format = getattr(explain_info, "format", None)
+        explain_options = getattr(explain_info, "options", {})
 
         explain_query_or_info = getattr(query, explain_attribute, None)
         sql = []
