@@ -318,3 +318,18 @@ class TestRecursiveCTE(TestCase):
         self.assertTrue(
             str(query.query).startswith('WITH RECURSIVE "cte" AS MATERIALIZED')
         )
+
+    def test_recursive_self_queryset(self):
+        def make_regions_cte(cte):
+            return Region.objects.filter(
+                pk="earth"
+            ).values("pk").union(
+                cte.join(Region, parent=cte.col.pk).values("pk")
+            )
+        cte = With.recursive(make_regions_cte)
+        queryset = cte.queryset().with_cte(cte).order_by("pk")
+        print(queryset.query)
+        self.assertEqual(list(queryset), [
+            {'pk': 'earth'},
+            {'pk': 'moon'},
+        ])
