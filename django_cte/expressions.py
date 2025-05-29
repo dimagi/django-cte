@@ -1,7 +1,7 @@
 from django.db.models import Subquery
 
 
-class CTESubqueryResolver(object):
+class CTESubqueryResolver:
 
     def __init__(self, annotation):
         self.annotation = annotation

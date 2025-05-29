@@ -1,7 +1,7 @@
 from django.db.models.sql.constants import INNER
 
 
-class QJoin(object):
+class QJoin:
     """Join clause with join condition from Q object clause
 
     :param parent_alias: Alias of parent table.

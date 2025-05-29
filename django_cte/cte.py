@@ -10,7 +10,7 @@ from .query import CTEQuery
 __all__ = ["With", "CTEManager", "CTEQuerySet"]
 
 
-class With(object):
+class With:
     """Common Table Expression query object: `WITH ...`
 
     :param queryset: A queryset to use as the body of the CTE.
