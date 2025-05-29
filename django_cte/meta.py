@@ -3,7 +3,7 @@ import weakref
 from django.db.models.expressions import Col, Expression
 
 
-class CTEColumns(object):
+class CTEColumns:
 
     def __init__(self, cte):
         self._cte = weakref.ref(cte)

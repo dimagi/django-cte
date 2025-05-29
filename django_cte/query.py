@@ -58,7 +58,7 @@ class CTEQuery(Query):
         return self.__chain("chain", klass)
 
 
-class CTECompiler(object):
+class CTECompiler:
 
     @classmethod
     def generate_sql(cls, connection, query, as_sql):
