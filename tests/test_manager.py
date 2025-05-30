@@ -2,7 +2,7 @@ from django.db.models.expressions import F
 from django.db.models.query import QuerySet
 from django.test import TestCase
 
-from django_cte import With, CTEQuerySet, CTEManager
+from django_cte import CTE, CTEQuerySet, CTEManager
 
 from .models import (
     Order,
@@ -48,7 +48,7 @@ class TestCTE(TestCase):
     def test_cte_queryset_with_from_queryset(self):
         self.assertEqual(type(OrderFromLT40.objects.all()), LT40QuerySet)
 
-        cte = With(
+        cte = CTE(
             OrderFromLT40.objects
             .annotate(region_parent=F("region__parent_id"))
             .filter(region__parent_id="sun")
@@ -77,7 +77,7 @@ class TestCTE(TestCase):
         ])
 
     def test_cte_queryset_with_custom_queryset(self):
-        cte = With(
+        cte = CTE(
             OrderCustomManagerNQuery.objects
             .annotate(region_parent=F("region__parent_id"))
             .filter(region__parent_id="sun")
@@ -102,7 +102,7 @@ class TestCTE(TestCase):
         ])
 
     def test_cte_queryset_with_deferred_loading(self):
-        cte = With(
+        cte = CTE(
             OrderCustomManagerNQuery.objects.order_by("id").only("id")[:1]
         )
         orders = cte.queryset().with_cte(cte)
