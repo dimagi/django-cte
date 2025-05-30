@@ -6,7 +6,7 @@ from django.db.models import Window
 from django.db.models.functions import Rank
 from django.test import TestCase, skipUnlessDBFeature
 
-from django_cte import CTE
+from django_cte import CTE, with_cte
 
 from .models import Order, Region, User
 
@@ -69,7 +69,7 @@ class WindowFunctions(TestCase):
             .values("region_id", "region_amount_rank")
             .filter(region_amount_rank=1, region_id__in=["sun", "moon"])
         )
-        qs = cte.join(Region, name=cte.col.region_id).with_cte(cte)
+        qs = with_cte(cte, select=cte.join(Region, name=cte.col.region_id))
         print(qs.query)
         # ProgrammingError: column cte.region_id does not exist
         # WITH RECURSIVE "cte" AS (SELECT * FROM (
