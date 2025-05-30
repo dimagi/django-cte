@@ -203,7 +203,7 @@ class TestCTE(TestCase):
         region_count = With(
             Region.objects
             .filter(parent="sun")
-            .values("parent")
+            .values("parent_id")
             .annotate(num=Count("name")),
             name="region_count",
         )
@@ -541,7 +541,7 @@ class TestCTE(TestCase):
         region_count = With(
             Region.objects
             .filter(parent="sun")
-            .values("parent")
+            .values("parent_id")
             .annotate(num=Count("name")),
             name="region_count",
         )
@@ -556,6 +556,7 @@ class TestCTE(TestCase):
             .annotate(region_count=region_count.col.num)
             .order_by("amount")
         )
+        print(orders.query)
 
         self.assertIsInstance(orders.explain(), str)
 
@@ -626,4 +627,16 @@ class TestCTE(TestCase):
             ('mars', 40),
             ('mars', 41),
             ('mars', 42),
+        ])
+
+    def test_cte_select_pk(self):
+        orders = Order.objects.filter(region="earth").values("pk")
+        cte = With(orders)
+        queryset = cte.join(orders, pk=cte.col.pk).with_cte(cte).order_by("pk")
+        print(queryset.query)
+        self.assertEqual(list(queryset), [
+            {'pk': 9},
+            {'pk': 10},
+            {'pk': 11},
+            {'pk': 12},
         ])

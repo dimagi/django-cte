@@ -6,6 +6,8 @@ license = {file = "LICENSE"}
 readme = {file = "README.md", content-type = "text/markdown"}
 dynamic = ["version"]
 requires-python = ">= 3.9"
+# Python and Django versions are read from this file by GitHub Actions.
+# Precise formatting is important.
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     'Environment :: Web Environment',
@@ -20,12 +22,13 @@ classifiers = [
     'Programming Language :: Python :: 3.11',
     'Programming Language :: Python :: 3.12',
     'Programming Language :: Python :: 3.13',
+    'Programming Language :: Python :: 3.14',
     'Framework :: Django',
     'Framework :: Django :: 4',
     'Framework :: Django :: 4.2',
     'Framework :: Django :: 5',
-    'Framework :: Django :: 5.0',
     'Framework :: Django :: 5.1',
+    'Framework :: Django :: 5.2',
     'Topic :: Software Development :: Libraries :: Python Modules',
 ]
 dependencies = ["django"]

@@ -75,7 +75,7 @@ class WindowFunctions(TestCase):
         #   SELECT "orders"."region_id" AS "col1", ...
         # "region" INNER JOIN "cte" ON "region"."name" = ("cte"."region_id")
         try:
-            self.assertSequenceEqual({r.name for r in qs}, {"moon", "sun"})
+            self.assertEqual({r.name for r in qs}, {"moon", "sun"})
         except (OperationalError, ProgrammingError) as err:
             if "cte.region_id" in str(err):
                 raise SkipTest(
@@ -83,4 +83,5 @@ class WindowFunctions(TestCase):
                     "column references"
                 )
             raise
-        assert 0, "unexpected pass"
+        if django.VERSION < (5, 2):
+            assert 0, "unexpected pass"

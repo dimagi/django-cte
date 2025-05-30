@@ -12,7 +12,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Read Python versions from pyproject.toml
-      id: read-versions
+      id: read-python-versions
       # produces output like: python_versions=[ "3.9", "3.10", "3.11", "3.12" ]
       run: >-
         echo "python_versions=$(
@@ -21,8 +21,20 @@ jobs:
         | jq --slurp .
         | tr '\n' ' '
         )" >> $GITHUB_OUTPUT
+    - name: Read Django versions from pyproject.toml
+      id: read-django-versions
+      # django_versions=[ "Django~=4.2.0", "Django~=5.1.0", "Django~=5.2.0" ]
+      run: >-
+        echo "django_versions=$(
+        grep -oP '(?<=Framework :: Django :: )\d+\.\d+' pyproject.toml
+        | sed -E 's/(.+)/Django~=\1.0/'
+        | jq --raw-input .
+        | jq --slurp .
+        | tr '\n' ' '
+        )" >> $GITHUB_OUTPUT
     outputs:
-      python_versions: ${{ steps.read-versions.outputs.python_versions }}
+      python_versions: ${{ steps.read-python-versions.outputs.python_versions }}
+      django_versions: ${{ steps.read-django-versions.outputs.django_versions }}
 
   tests:
     needs: [configure]
@@ -31,13 +43,10 @@ jobs:
       fail-fast: false
       matrix:
         python: ${{ fromJSON(needs.configure.outputs.python_versions) }}
-        django:
-        - 'Django>=4.2,<4.3'
-        - 'Django>=5.0,<5.1'
-        - 'Django>=5.1,<5.2'
+        django: ${{ fromJSON(needs.configure.outputs.django_versions) }}
         exclude:
-        - {python: '3.9', django: 'Django>=5.0,<5.1'}
-        - {python: '3.9', django: 'Django>=5.1,<5.2'}
+        - {python: '3.9', django: 'Django~=5.1.0'}
+        - {python: '3.9', django: 'Django~=5.2.0'}
     services:
       postgres:
         image: postgres:latest
