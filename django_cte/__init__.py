@@ -1,3 +1,3 @@
 from .cte import CTEManager, CTEQuerySet, With  # noqa
 
-__version__ = "1.3.3"
+__version__ = "2.0.0"
