@@ -8,7 +8,7 @@ from django.db.models.expressions import (
 from django.db.models.sql.constants import LOUTER
 from django.test import TestCase
 
-from django_cte import CTE
+from django_cte import CTE, with_cte
 from django_cte import CTEManager
 
 from .models import Order, Region, User
@@ -26,16 +26,14 @@ class TestCTE(TestCase):
             .annotate(total=Sum("amount"))
         )
 
-        orders = (
-            # FROM orders INNER JOIN cte ON orders.region_id = cte.region_id
-            cte.join(Order, region=cte.col.region_id)
+        orders = with_cte(
+            # WITH cte ...
+            cte,
 
-            # Add `WITH ...` before `SELECT ... FROM orders ...`
-            .with_cte(cte)
-
-            # Annotate each Order with a "region_total"
-            .annotate(region_total=cte.col.total)
-        )
+            # SELECT ... FROM orders
+            # INNER JOIN cte ON orders.region_id = cte.region_id
+            select=cte.join(Order, region=cte.col.region_id),
+        ).annotate(region_total=cte.col.total)
         print(orders.query)
 
         data = sorted((o.amount, o.region_id, o.region_total) for o in orders)
@@ -72,10 +70,9 @@ class TestCTE(TestCase):
             .annotate(total=Sum("amount")),
             name="mixedCaseCTEName"
         )
-        orders = (
-            totals
-            .join(Order, region=totals.col.region_id)
-            .with_cte(totals)
+        orders = with_cte(
+            totals,
+            select=totals.join(Order, region=totals.col.region_id)
             .annotate(region_total=totals.col.total)
             .order_by("amount")
         )
@@ -88,10 +85,9 @@ class TestCTE(TestCase):
             .values(region_parent=F("region__parent_id"))
             .annotate(total=Sum("amount")),
         )
-        regions = (
-            Region.objects.all()
-            .with_cte(sub_totals)
-            .annotate(
+        regions = with_cte(
+            sub_totals,
+            select=Region.objects.annotate(
                 child_regions_total=Subquery(
                     sub_totals.queryset()
                     .filter(region_parent=OuterRef("name"))
@@ -122,7 +118,10 @@ class TestCTE(TestCase):
             Order.objects
             .annotate(region_parent=F("region__parent_id")),
         )
-        orders = cte.queryset().with_cte(cte)
+        orders = with_cte(
+            cte,         # WITH cte AS (...)
+            select=cte,  # SELECT ... FROM cte
+        )
         print(orders.query)
 
         data = sorted(
@@ -144,9 +143,9 @@ class TestCTE(TestCase):
             Order.objects
             .annotate(region_parent=F("region__parent_id")),
         )
-        orders = (
-            cte.queryset()
-            .with_cte(cte)
+        orders = with_cte(
+            cte,
+            select=cte.queryset()
             .annotate(parent=F("region__parent_id"))
             .order_by("region_id", "amount")
         )
@@ -170,11 +169,7 @@ class TestCTE(TestCase):
             )
             .distinct()
         )
-        values = (
-            cte.queryset()
-            .with_cte(cte)
-            .filter(region_parent__isnull=False)
-        )
+        values = with_cte(cte, select=cte).filter(region_parent__isnull=False)
         print(values.query)
 
         def key(item):
@@ -207,13 +202,13 @@ class TestCTE(TestCase):
             .annotate(num=Count("name")),
             name="region_count",
         )
-        orders = (
-            region_count.join(
+        orders = with_cte(
+            totals,
+            region_count,
+            select=region_count.join(
                 totals.join(Order, region=totals.col.region_id),
                 region__parent=region_count.col.parent_id
             )
-            .with_cte(totals)
-            .with_cte(region_count)
             .annotate(region_total=totals.col.total)
             .annotate(region_count=region_count.col.num)
             .order_by("amount")
@@ -270,11 +265,10 @@ class TestCTE(TestCase):
             name="totals",
         )
 
-        root_regions = (
-            totals.join(Region, name=totals.col.root)
-            .with_cte(rootmap)
-            .with_cte(totals)
-            .annotate(
+        root_regions = with_cte(
+            rootmap,
+            totals,
+            select=totals.join(Region, name=totals.col.root).annotate(
                 # count of orders in this region and all subregions
                 orders_count=totals.col.orders_count,
                 # sum of order amounts in this region and all subregions
@@ -299,10 +293,9 @@ class TestCTE(TestCase):
             .annotate(total=Sum("amount")),
             materialized=True
         )
-        orders = (
-            totals
-            .join(Order, region=totals.col.region_id)
-            .with_cte(totals)
+        orders = with_cte(
+            totals,
+            select=totals.join(Order, region=totals.col.region_id)
             .annotate(region_total=totals.col.total)
             .order_by("amount")
         )
@@ -320,7 +313,7 @@ class TestCTE(TestCase):
             .filter(total__isnull=False)
         )
         # not the most efficient query, but it exercises CTEUpdateQuery
-        Order.objects.all().with_cte(cte).filter(region_id__in=Subquery(
+        with_cte(cte, select=Order).filter(region_id__in=Subquery(
             cte.queryset()
             .filter(region_parent=OuterRef("region_id"))
             .values("region_parent")
@@ -370,7 +363,7 @@ class TestCTE(TestCase):
             .annotate(total=Sum("amount"))
             .filter(total__isnull=False)
         )
-        Order.objects.all().with_cte(cte).annotate(
+        with_cte(cte, select=Order).annotate(
             cte_has_order=Exists(
                 cte.queryset()
                 .values("total")
@@ -405,7 +398,8 @@ class TestCTE(TestCase):
             Region.objects
             .annotate(
                 difference=Subquery(
-                    min_and_max.queryset().with_cte(min_and_max).annotate(
+                    with_cte(min_and_max, select=min_and_max)
+                    .annotate(
                         difference=ExpressionWrapper(
                             F('amount_max') - F('amount_min'),
                             output_field=int_field,
@@ -440,10 +434,10 @@ class TestCTE(TestCase):
             .annotate(total=Sum("amount"))
             .filter(total__gt=100)
         )
-        orders = (
-            totals
+        orders = with_cte(
+            totals,
+            select=totals
             .join(Order, region=totals.col.region_id, _join_type=LOUTER)
-            .with_cte(totals)
             .annotate(region_total=totals.col.total)
         )
         print(orders.query)
@@ -496,10 +490,9 @@ class TestCTE(TestCase):
                 ),
             ),
         )
-        regions = (
-            Region.objects.all()
-            .with_cte(sub_totals)
-            .annotate(
+        regions = with_cte(
+            sub_totals,
+            select=Region.objects.annotate(
                 child_regions_total=Subquery(
                     sub_totals.queryset()
                     .filter(region_parent=OuterRef("name"))
@@ -545,13 +538,13 @@ class TestCTE(TestCase):
             .annotate(num=Count("name")),
             name="region_count",
         )
-        orders = (
-            region_count.join(
+        orders = with_cte(
+            totals,
+            region_count,
+            select=region_count.join(
                 totals.join(Order, region=totals.col.region_id),
                 region__parent=region_count.col.parent_id
             )
-            .with_cte(totals)
-            .with_cte(region_count)
             .annotate(region_total=totals.col.total)
             .annotate(region_count=region_count.col.num)
             .order_by("amount")
@@ -572,9 +565,9 @@ class TestCTE(TestCase):
             .annotate(total=Sum("amount")),
             name="totals",
         )
-        orders = (
-            totals.join(Order, region=totals.col.region_id)
-            .with_cte(totals)
+        orders = with_cte(
+            totals,
+            select=totals.join(Order, region=totals.col.region_id)
             .annotate(region_total=totals.col.total)
             .order_by("amount")
         )
@@ -589,9 +582,10 @@ class TestCTE(TestCase):
             .annotate(total=Sum("amount")),
             name="totals",
         )
-        orders = (
-            totals.join(Order, region=totals.col.region_id, _join_type=LOUTER)
-            .with_cte(totals)
+        orders = with_cte(
+            totals,
+            select=totals
+            .join(Order, region=totals.col.region_id, _join_type=LOUTER)
             .annotate(region_total=totals.col.total)
             .order_by("amount")
         )
@@ -611,9 +605,9 @@ class TestCTE(TestCase):
         mars_orders = orders_cte_queryset.filter(region="mars")
 
         earth_mars = earth_orders.union(mars_orders, all=True)
-        earth_mars_cte = (
-            earth_mars
-            .with_cte(orders_cte)
+        earth_mars_cte = with_cte(
+            orders_cte,
+            select=earth_mars
             .order_by("region", "amount")
             .values_list("region", "amount")
         )
@@ -632,7 +626,9 @@ class TestCTE(TestCase):
     def test_cte_select_pk(self):
         orders = Order.objects.filter(region="earth").values("pk")
         cte = CTE(orders)
-        queryset = cte.join(orders, pk=cte.col.pk).with_cte(cte).order_by("pk")
+        queryset = with_cte(
+            cte, select=cte.join(orders, pk=cte.col.pk)
+        ).order_by("pk")
         print(queryset.query)
         self.assertEqual(list(queryset), [
             {'pk': 9},
@@ -655,9 +651,9 @@ class TestCTE(TestCase):
                 "region_name",
             )
         )
-        qs = (
-            cte.queryset()
-            .with_cte(cte)
+        qs = with_cte(
+            cte,
+            select=cte.queryset()
             .values(
                 amt=cte.col.amount,
                 pnt_id=cte.col.pnt_id,

@@ -16,7 +16,7 @@ from django.db.models.functions import Concat
 from django.db.utils import DatabaseError
 from django.test import TestCase
 
-from django_cte import CTE
+from django_cte import CTE, with_cte
 
 from .models import KeyPair, Region
 
@@ -50,9 +50,9 @@ class TestRecursiveCTE(TestCase):
 
         cte = CTE.recursive(make_regions_cte)
 
-        regions = (
-            cte.join(Region, name=cte.col.name)
-            .with_cte(cte)
+        regions = with_cte(
+            cte,
+            select=cte.join(Region, name=cte.col.name)
             .annotate(
                 path=cte.col.path,
                 depth=cte.col.depth,
@@ -109,7 +109,9 @@ class TestRecursiveCTE(TestCase):
                 all=True,
             )
         cte = CTE.recursive(make_regions_cte)
-        regions = cte.join(Region, name=cte.col.name).with_cte(cte).annotate(
+        regions = with_cte(
+            cte, select=cte.join(Region, name=cte.col.name)
+        ).annotate(
             path=cte.col.path,
             depth=cte.col.depth,
             is_planet=cte.col.is_planet,
@@ -136,7 +138,7 @@ class TestRecursiveCTE(TestCase):
                 all=True,
             )
         cte = CTE.recursive(make_regions_cte)
-        regions = cte.join(Region, name=cte.col.name).with_cte(cte)
+        regions = with_cte(cte, select=cte.join(Region, name=cte.col.name))
 
         print(regions.query)
         try:
@@ -165,7 +167,7 @@ class TestRecursiveCTE(TestCase):
                 depth=cte.col.depth + 1,
             )
         cte = CTE.recursive(make_bad_cte)
-        regions = cte.join(Region, name=cte.col.name).with_cte(cte)
+        regions = with_cte(cte, select=cte.join(Region, name=cte.col.name))
         with self.assertRaises(ValueError) as context:
             print(regions.query)
         self.assertIn("Circular reference:", str(context.exception))
@@ -185,10 +187,9 @@ class TestRecursiveCTE(TestCase):
                 all=True,
             )
         cte = CTE.recursive(make_regions_cte)
-        regions = (
-            Region.objects.all()
-            .with_cte(cte)
-            .annotate(_ex=Exists(
+        regions = with_cte(
+            cte,
+            select=Region.objects.annotate(_ex=Exists(
                 cte.queryset()
                 .values(value=Value("1", output_field=int_field))
                 .filter(name=OuterRef("name"))
@@ -214,7 +215,7 @@ class TestRecursiveCTE(TestCase):
                 all=True,
             )
         cte = CTE.recursive(make_regions_cte)
-        regions = cte.queryset().with_cte(cte).filter(depth=2).order_by("name")
+        regions = with_cte(cte, select=cte).filter(depth=2).order_by("name")
 
         pickled_qs = pickle.loads(pickle.dumps(regions))
 
@@ -230,15 +231,13 @@ class TestRecursiveCTE(TestCase):
                 value=F('name'),
             ).union(
                 cte.join(
-                    Region.objects.all().annotate(
-                        value=F('name'),
-                    ),
+                    Region.objects.annotate(value=F('name')),
                     parent_id=cte.col.name,
                 ),
                 all=True,
             )
         cte = CTE.recursive(make_regions_cte)
-        query = cte.queryset().with_cte(cte)
+        query = with_cte(cte, select=cte)
 
         exclude_leaves = CTE(cte.queryset().filter(
             parent__name='sun',
@@ -246,14 +245,14 @@ class TestRecursiveCTE(TestCase):
             value=Concat(F('name'), F('name'))
         ), name='value_cte')
 
-        query = query.annotate(
+        query = with_cte(exclude_leaves, select=query.annotate(
             _exclude_leaves=Exists(
                 exclude_leaves.queryset().filter(
                     name=OuterRef("name"),
                     value=OuterRef("value"),
                 )
             )
-        ).filter(_exclude_leaves=True).with_cte(exclude_leaves)
+        ).filter(_exclude_leaves=True))
         print(query.query)
 
         # Nothing should be returned.
@@ -268,7 +267,7 @@ class TestRecursiveCTE(TestCase):
                 rank=F('value'),
             ).union(
                 cte.join(
-                    KeyPair.objects.all().order_by(),
+                    KeyPair.objects.order_by(),
                     parent_id=cte.col.id,
                 ).annotate(
                     rank=F('value'),
@@ -276,7 +275,7 @@ class TestRecursiveCTE(TestCase):
                 all=True,
             )
         cte = CTE.recursive(make_regions_cte)
-        children = cte.queryset().with_cte(cte)
+        children = with_cte(cte, select=cte)
 
         xdups = CTE(cte.queryset().filter(
             parent__key="level 1",
@@ -284,7 +283,7 @@ class TestRecursiveCTE(TestCase):
             rank=F('value')
         ).values('id', 'rank'), name='xdups')
 
-        children = children.annotate(
+        children = with_cte(xdups, select=children.annotate(
             _exclude=Exists(
                 (
                     xdups.queryset().filter(
@@ -293,7 +292,7 @@ class TestRecursiveCTE(TestCase):
                     )
                 )
             )
-        ).filter(_exclude=True).with_cte(xdups)
+        ).filter(_exclude=True))
 
         print(children.query)
         query = KeyPair.objects.filter(parent__in=children)
@@ -313,7 +312,7 @@ class TestRecursiveCTE(TestCase):
             return KeyPair.objects.all()
         cte = CTE.recursive(make_regions_cte, materialized=True)
 
-        query = KeyPair.objects.with_cte(cte)
+        query = with_cte(cte, select=KeyPair)
         print(query.query)
         self.assertTrue(
             str(query.query).startswith('WITH RECURSIVE "cte" AS MATERIALIZED')
@@ -327,7 +326,7 @@ class TestRecursiveCTE(TestCase):
                 cte.join(Region, parent=cte.col.pk).values("pk")
             )
         cte = CTE.recursive(make_regions_cte)
-        queryset = cte.queryset().with_cte(cte).order_by("pk")
+        queryset = with_cte(cte, select=cte).order_by("pk")
         print(queryset.query)
         self.assertEqual(list(queryset), [
             {'pk': 'earth'},

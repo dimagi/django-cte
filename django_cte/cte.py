@@ -7,7 +7,27 @@ from .join import QJoin, INNER
 from .meta import CTEColumnRef, CTEColumns
 from .query import CTEQuery
 
-__all__ = ["CTE", "CTEManager", "CTEQuerySet"]
+__all__ = ["CTE", "with_cte", "CTEManager", "CTEQuerySet"]
+
+
+def with_cte(*ctes, select):
+    """Add Common Table Expression(s) (CTEs) to a model or queryset
+
+    :param *ctes: One or more CTE objects.
+    :param select: A model class, queryset, or CTE to use as the base
+        query to which CTEs are attached.
+    :param name: Optional name parameter for the CTE (default: "cte").
+    :param materialized: Optional parameter (default: False) which
+        enforce using of MATERIALIZED statement for supporting
+        databases.
+    :returns: A queryset with the given CTE added to it.
+    """
+    if isinstance(select, CTE):
+        select = select.queryset()
+    elif not isinstance(select, QuerySet):
+        select = select._default_manager.all()
+    select.query._with_ctes.extend(ctes)
+    return select
 
 
 class CTE:
@@ -60,8 +80,8 @@ class CTE:
 
         This CTE will be refernced by the returned queryset, but the
         corresponding `WITH ...` statement will not be prepended to the
-        queryset's SQL output; use `<CTEQuerySet>.with_cte(cte)` to
-        achieve that outcome.
+        queryset's SQL output; use `with_cte(cte, select=cte.join(...))`
+        to achieve that outcome.
 
         :param model_or_queryset: Model class or queryset to which the
         CTE should be joined.
@@ -96,8 +116,8 @@ class CTE:
 
         This CTE will be referenced by the returned queryset, but the
         corresponding `WITH ...` statement will not be prepended to the
-        queryset's SQL output; use `<CTEQuerySet>.with_cte(cte)` to
-        achieve that outcome.
+        queryset's SQL output; use `with_cte(cte, select=cte)` to do
+        that.
 
         :returns: A queryset.
         """

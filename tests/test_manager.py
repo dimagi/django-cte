@@ -2,7 +2,7 @@ from django.db.models.expressions import F
 from django.db.models.query import QuerySet
 from django.test import TestCase
 
-from django_cte import CTE, CTEQuerySet, CTEManager
+from django_cte import CTE, CTEQuerySet, CTEManager, with_cte
 
 from .models import (
     Order,
@@ -53,9 +53,9 @@ class TestCTE(TestCase):
             .annotate(region_parent=F("region__parent_id"))
             .filter(region__parent_id="sun")
         )
-        orders = (
-            cte.queryset()
-            .with_cte(cte)
+        orders = with_cte(
+            cte,
+            select=cte.queryset()
             .lt40()  # custom queryset method
             .order_by("region_id", "amount")
         )
@@ -82,9 +82,9 @@ class TestCTE(TestCase):
             .annotate(region_parent=F("region__parent_id"))
             .filter(region__parent_id="sun")
         )
-        orders = (
-            cte.queryset()
-            .with_cte(cte)
+        orders = with_cte(
+            cte,
+            select=cte.queryset()
             .lt25()  # custom queryset method
             .order_by("region_id", "amount")
         )
@@ -105,7 +105,7 @@ class TestCTE(TestCase):
         cte = CTE(
             OrderCustomManagerNQuery.objects.order_by("id").only("id")[:1]
         )
-        orders = cte.queryset().with_cte(cte)
+        orders = with_cte(cte, select=cte)
         print(orders.query)
 
         self.assertEqual([x.id for x in orders], [1])
