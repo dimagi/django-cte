@@ -7,11 +7,11 @@ from .join import QJoin, INNER
 from .meta import CTEColumnRef, CTEColumns
 from .query import CTEQuery
 
-__all__ = ["With", "CTEManager", "CTEQuerySet"]
+__all__ = ["CTE", "CTEManager", "CTEQuerySet"]
 
 
-class With:
-    """Common Table Expression query object: `WITH ...`
+class CTE:
+    """Common Table Expression
 
     :param queryset: A queryset to use as the body of the CTE.
     :param name: Optional name parameter for the CTE (default: "cte").
@@ -41,7 +41,7 @@ class With:
 
     @classmethod
     def recursive(cls, make_cte_queryset, name="cte", materialized=False):
-        """Recursive Common Table Expression: `WITH RECURSIVE ...`
+        """Recursive Common Table Expression
 
         :param make_cte_queryset: Function taking a single argument (a
         not-yet-fully-constructed cte object) and returning a `QuerySet`
@@ -129,6 +129,14 @@ class With:
         if selected and name in selected and name not in self.query.annotations:
             return Ref(name, self.query.resolve_ref(name))
         return self.query.resolve_ref(name)
+
+
+def With(*args, **kw):
+    """DEPRECATED: Use `CTE()` instead."""
+    return CTE(*args, **kw)
+
+
+With.recursive = CTE.recursive
 
 
 class CTEQuerySet(QuerySet):

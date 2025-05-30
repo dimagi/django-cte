@@ -16,7 +16,7 @@ from django.db.models.functions import Concat
 from django.db.utils import DatabaseError
 from django.test import TestCase
 
-from django_cte import With
+from django_cte import CTE
 
 from .models import KeyPair, Region
 
@@ -48,7 +48,7 @@ class TestRecursiveCTE(TestCase):
                 all=True,
             )
 
-        cte = With.recursive(make_regions_cte)
+        cte = CTE.recursive(make_regions_cte)
 
         regions = (
             cte.join(Region, name=cte.col.name)
@@ -108,7 +108,7 @@ class TestRecursiveCTE(TestCase):
                 ),
                 all=True,
             )
-        cte = With.recursive(make_regions_cte)
+        cte = CTE.recursive(make_regions_cte)
         regions = cte.join(Region, name=cte.col.name).with_cte(cte).annotate(
             path=cte.col.path,
             depth=cte.col.depth,
@@ -135,7 +135,7 @@ class TestRecursiveCTE(TestCase):
                 cte.join(Region, parent=cte.col.name),
                 all=True,
             )
-        cte = With.recursive(make_regions_cte)
+        cte = CTE.recursive(make_regions_cte)
         regions = cte.join(Region, name=cte.col.name).with_cte(cte)
 
         print(regions.query)
@@ -164,7 +164,7 @@ class TestRecursiveCTE(TestCase):
             return cte.join(Region, parent=cte.col.name).values(
                 depth=cte.col.depth + 1,
             )
-        cte = With.recursive(make_bad_cte)
+        cte = CTE.recursive(make_bad_cte)
         regions = cte.join(Region, name=cte.col.name).with_cte(cte)
         with self.assertRaises(ValueError) as context:
             print(regions.query)
@@ -184,7 +184,7 @@ class TestRecursiveCTE(TestCase):
                 ),
                 all=True,
             )
-        cte = With.recursive(make_regions_cte)
+        cte = CTE.recursive(make_regions_cte)
         regions = (
             Region.objects.all()
             .with_cte(cte)
@@ -213,7 +213,7 @@ class TestRecursiveCTE(TestCase):
                 ),
                 all=True,
             )
-        cte = With.recursive(make_regions_cte)
+        cte = CTE.recursive(make_regions_cte)
         regions = cte.queryset().with_cte(cte).filter(depth=2).order_by("name")
 
         pickled_qs = pickle.loads(pickle.dumps(regions))
@@ -237,10 +237,10 @@ class TestRecursiveCTE(TestCase):
                 ),
                 all=True,
             )
-        cte = With.recursive(make_regions_cte)
+        cte = CTE.recursive(make_regions_cte)
         query = cte.queryset().with_cte(cte)
 
-        exclude_leaves = With(cte.queryset().filter(
+        exclude_leaves = CTE(cte.queryset().filter(
             parent__name='sun',
         ).annotate(
             value=Concat(F('name'), F('name'))
@@ -275,10 +275,10 @@ class TestRecursiveCTE(TestCase):
                 ),
                 all=True,
             )
-        cte = With.recursive(make_regions_cte)
+        cte = CTE.recursive(make_regions_cte)
         children = cte.queryset().with_cte(cte)
 
-        xdups = With(cte.queryset().filter(
+        xdups = CTE(cte.queryset().filter(
             parent__key="level 1",
         ).annotate(
             rank=F('value')
@@ -311,7 +311,7 @@ class TestRecursiveCTE(TestCase):
         # This test covers MATERIALIZED option in SQL query
         def make_regions_cte(cte):
             return KeyPair.objects.all()
-        cte = With.recursive(make_regions_cte, materialized=True)
+        cte = CTE.recursive(make_regions_cte, materialized=True)
 
         query = KeyPair.objects.with_cte(cte)
         print(query.query)
@@ -326,7 +326,7 @@ class TestRecursiveCTE(TestCase):
             ).values("pk").union(
                 cte.join(Region, parent=cte.col.pk).values("pk")
             )
-        cte = With.recursive(make_regions_cte)
+        cte = CTE.recursive(make_regions_cte)
         queryset = cte.queryset().with_cte(cte).order_by("pk")
         print(queryset.query)
         self.assertEqual(list(queryset), [

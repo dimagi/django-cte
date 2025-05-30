@@ -3,7 +3,7 @@ from django.db.models import Value
 from django.db.models.aggregates import Sum
 from django.test import TestCase
 
-from django_cte import With
+from django_cte import CTE
 
 from .models import Order, OrderPlainManager
 
@@ -11,13 +11,13 @@ from .models import Order, OrderPlainManager
 class TestCTECombinators(TestCase):
 
     def test_cte_union_query(self):
-        one = With(
+        one = CTE(
             Order.objects
             .values("region_id")
             .annotate(total=Sum("amount")),
             name="one"
         )
-        two = With(
+        two = CTE(
             Order.objects
             .values("region_id")
             .annotate(total=Sum("amount") * 2),
@@ -71,7 +71,7 @@ class TestCTECombinators(TestCase):
         ])
 
     def test_cte_union_with_non_cte_query(self):
-        one = With(
+        one = CTE(
             Order.objects
             .values("region_id")
             .annotate(total=Sum("amount")),
@@ -106,13 +106,13 @@ class TestCTECombinators(TestCase):
         ])
 
     def test_cte_union_with_duplicate_names(self):
-        cte_sun = With(
+        cte_sun = CTE(
             Order.objects
             .filter(region__parent="sun")
             .values("region_id")
             .annotate(total=Sum("amount")),
         )
-        cte_proxima = With(
+        cte_proxima = CTE(
             Order.objects
             .filter(region__parent="proxima centauri")
             .values("region_id")
@@ -135,7 +135,7 @@ class TestCTECombinators(TestCase):
             orders_sun.union(orders_proxima)
 
     def test_cte_union_of_same_cte(self):
-        cte = With(
+        cte = CTE(
             Order.objects
             .filter(region__parent="sun")
             .values("region_id")
@@ -189,13 +189,13 @@ class TestCTECombinators(TestCase):
         ])
 
     def test_cte_intersection(self):
-        cte_big = With(
+        cte_big = CTE(
             Order.objects
             .values("region_id")
             .annotate(total=Sum("amount")),
             name='big'
         )
-        cte_small = With(
+        cte_small = CTE(
             Order.objects
             .values("region_id")
             .annotate(total=Sum("amount")),
@@ -229,13 +229,13 @@ class TestCTECombinators(TestCase):
         ])
 
     def test_cte_difference(self):
-        cte_big = With(
+        cte_big = CTE(
             Order.objects
             .values("region_id")
             .annotate(total=Sum("amount")),
             name='big'
         )
-        cte_small = With(
+        cte_small = CTE(
             Order.objects
             .values("region_id")
             .annotate(total=Sum("amount")),

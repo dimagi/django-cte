@@ -8,7 +8,7 @@ from django.db.models.expressions import (
 from django.db.models.sql.constants import LOUTER
 from django.test import TestCase
 
-from django_cte import With
+from django_cte import CTE
 from django_cte import CTEManager
 
 from .models import Order, Region, User
@@ -20,7 +20,7 @@ text_field = TextField()
 class TestCTE(TestCase):
 
     def test_simple_cte_query(self):
-        cte = With(
+        cte = CTE(
             Order.objects
             .values("region_id")
             .annotate(total=Sum("amount"))
@@ -65,7 +65,7 @@ class TestCTE(TestCase):
         ])
 
     def test_cte_name_escape(self):
-        totals = With(
+        totals = CTE(
             Order.objects
             .filter(region__parent="sun")
             .values("region_id")
@@ -83,7 +83,7 @@ class TestCTE(TestCase):
             str(orders.query).startswith('WITH RECURSIVE "mixedCaseCTEName"'))
 
     def test_cte_queryset(self):
-        sub_totals = With(
+        sub_totals = CTE(
             Order.objects
             .values(region_parent=F("region__parent_id"))
             .annotate(total=Sum("amount")),
@@ -118,7 +118,7 @@ class TestCTE(TestCase):
         ])
 
     def test_cte_queryset_with_model_result(self):
-        cte = With(
+        cte = CTE(
             Order.objects
             .annotate(region_parent=F("region__parent_id")),
         )
@@ -140,7 +140,7 @@ class TestCTE(TestCase):
         )
 
     def test_cte_queryset_with_join(self):
-        cte = With(
+        cte = CTE(
             Order.objects
             .annotate(region_parent=F("region__parent_id")),
         )
@@ -162,7 +162,7 @@ class TestCTE(TestCase):
         ])
 
     def test_cte_queryset_with_values_result(self):
-        cte = With(
+        cte = CTE(
             Order.objects
             .values(
                 "region_id",
@@ -193,14 +193,14 @@ class TestCTE(TestCase):
         ])
 
     def test_named_simple_ctes(self):
-        totals = With(
+        totals = CTE(
             Order.objects
             .filter(region__parent="sun")
             .values("region_id")
             .annotate(total=Sum("amount")),
             name="totals",
         )
-        region_count = With(
+        region_count = CTE(
             Region.objects
             .filter(parent="sun")
             .values("parent_id")
@@ -257,9 +257,9 @@ class TestCTE(TestCase):
                 ),
                 all=True,
             )
-        rootmap = With.recursive(make_root_mapping, name="rootmap")
+        rootmap = CTE.recursive(make_root_mapping, name="rootmap")
 
-        totals = With(
+        totals = CTE(
             rootmap.join(Order, region_id=rootmap.col.name)
             .values(
                 root=rootmap.col.root,
@@ -292,7 +292,7 @@ class TestCTE(TestCase):
         ])
 
     def test_materialized_option(self):
-        totals = With(
+        totals = CTE(
             Order.objects
             .filter(region__parent="sun")
             .values("region_id")
@@ -313,7 +313,7 @@ class TestCTE(TestCase):
         )
 
     def test_update_cte_query(self):
-        cte = With(
+        cte = CTE(
             Order.objects
             .values(region_parent=F("region__parent_id"))
             .annotate(total=Sum("amount"))
@@ -364,7 +364,7 @@ class TestCTE(TestCase):
             "calls `self.query.chain(sql.DeleteQuery)` instead of "
             "`sql.DeleteQuery(self.model)`"
         )
-        cte = With(
+        cte = CTE(
             Order.objects
             .values(region_parent=F("region__parent_id"))
             .annotate(total=Sum("amount"))
@@ -391,7 +391,7 @@ class TestCTE(TestCase):
     def test_outerref_in_cte_query(self):
         # This query is meant to return the difference between min and max
         # order of each region, through a subquery
-        min_and_max = With(
+        min_and_max = CTE(
             Order.objects
             .filter(region=OuterRef("pk"))
             .values('region')  # This is to force group by region_id
@@ -434,7 +434,7 @@ class TestCTE(TestCase):
         ])
 
     def test_experimental_left_outer_join(self):
-        totals = With(
+        totals = CTE(
             Order.objects
             .values("region_id")
             .annotate(total=Sum("amount"))
@@ -484,7 +484,7 @@ class TestCTE(TestCase):
         """
         self.assertNotIsInstance(User.objects, CTEManager)
 
-        sub_totals = With(
+        sub_totals = CTE(
             Order.objects
             .values(region_parent=F("region__parent_id"))
             .annotate(
@@ -531,14 +531,14 @@ class TestCTE(TestCase):
         correct position
         """
 
-        totals = With(
+        totals = CTE(
             Order.objects
             .filter(region__parent="sun")
             .values("region_id")
             .annotate(total=Sum("amount")),
             name="totals",
         )
-        region_count = With(
+        region_count = CTE(
             Region.objects
             .filter(parent="sun")
             .values("parent_id")
@@ -565,7 +565,7 @@ class TestCTE(TestCase):
         Verifies that the CTEQueryCompiler can handle empty result sets in the
         related CTEs
         """
-        totals = With(
+        totals = CTE(
             Order.objects
             .filter(id__in=[])
             .values("region_id")
@@ -582,7 +582,7 @@ class TestCTE(TestCase):
         self.assertEqual(len(orders), 0)
 
     def test_left_outer_join_on_empty_result_set_cte(self):
-        totals = With(
+        totals = CTE(
             Order.objects
             .filter(id__in=[])
             .values("region_id")
@@ -604,7 +604,7 @@ class TestCTE(TestCase):
             .filter(region__parent="sun")
             .only("region", "amount")
         )
-        orders_cte = With(orders, name="orders_cte")
+        orders_cte = CTE(orders, name="orders_cte")
         orders_cte_queryset = orders_cte.queryset()
 
         earth_orders = orders_cte_queryset.filter(region="earth")
@@ -631,7 +631,7 @@ class TestCTE(TestCase):
 
     def test_cte_select_pk(self):
         orders = Order.objects.filter(region="earth").values("pk")
-        cte = With(orders)
+        cte = CTE(orders)
         queryset = cte.join(orders, pk=cte.col.pk).with_cte(cte).order_by("pk")
         print(queryset.query)
         self.assertEqual(list(queryset), [
@@ -642,7 +642,7 @@ class TestCTE(TestCase):
         ])
 
     def test_django52_resolve_ref_regression(self):
-        cte = With(
+        cte = CTE(
             Order.objects.annotate(
                 pnt_id=F("region__parent_id"),
                 region_name=F("region__name"),

@@ -1,7 +1,7 @@
 from django.db.models import IntegerField, TextField
 from django.test import TestCase
 
-from django_cte import With
+from django_cte import CTE
 from django_cte.raw import raw_cte_sql
 
 from .models import Region
@@ -13,7 +13,7 @@ text_field = TextField()
 class TestRawCTE(TestCase):
 
     def test_raw_cte_sql(self):
-        cte = With(raw_cte_sql(
+        cte = CTE(raw_cte_sql(
             """
             SELECT region_id, AVG(amount) AS avg_order
             FROM orders
@@ -35,7 +35,7 @@ class TestRawCTE(TestCase):
         self.assertEqual(data, [('moon', 'earth', 2)])
 
     def test_raw_cte_sql_name_escape(self):
-        cte = With(
+        cte = CTE(
             raw_cte_sql(
                 """
                 SELECT region_id, AVG(amount) AS avg_order
