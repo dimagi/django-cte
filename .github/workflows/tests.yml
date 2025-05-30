@@ -21,7 +21,7 @@ jobs:
         | jq --slurp .
         | tr '\n' ' '
         )" >> $GITHUB_OUTPUT
-    - name: Read Djagno versions from pyproject.toml
+    - name: Read Django versions from pyproject.toml
       id: read-django-versions
       # django_versions=[ "Django~=4.2.0", "Django~=5.1.0", "Django~=5.2.0" ]
       run: >-
