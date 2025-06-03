@@ -1,49 +1,16 @@
 from django.db.models.expressions import F
-from django.db.models.query import QuerySet
 from django.test import TestCase
 
-from django_cte import CTE, CTEQuerySet, CTEManager, with_cte
+from django_cte import CTE, with_cte
 
 from .models import (
-    Order,
     OrderFromLT40,
-    OrderLT40AsManager,
     OrderCustomManagerNQuery,
-    OrderCustomManager,
     LT40QuerySet,
-    LTManager,
-    LT25QuerySet,
 )
 
 
 class TestCTE(TestCase):
-    def test_cte_queryset_correct_defaultmanager(self):
-        self.assertEqual(type(Order._default_manager), CTEManager)
-        self.assertEqual(type(Order.objects.all()), CTEQuerySet)
-
-    def test_cte_queryset_correct_from_queryset(self):
-        self.assertEqual(type(OrderFromLT40.objects.all()), LT40QuerySet)
-
-    def test_cte_queryset_correct_queryset_as_manager(self):
-        self.assertEqual(type(OrderLT40AsManager.objects.all()), LT40QuerySet)
-
-    def test_cte_queryset_correct_manager_n_from_queryset(self):
-        self.assertIsInstance(
-            OrderCustomManagerNQuery._default_manager, LTManager)
-        self.assertEqual(type(
-            OrderCustomManagerNQuery.objects.all()), LT25QuerySet)
-
-    def test_cte_create_manager_from_non_cteQuery(self):
-        class BrokenQuerySet(QuerySet):
-            "This should be a CTEQuerySet if we want this to work"
-
-        with self.assertRaises(TypeError):
-            CTEManager.from_queryset(BrokenQuerySet)()
-
-    def test_cte_queryset_correct_limitedmanager(self):
-        self.assertEqual(type(OrderCustomManager._default_manager), LTManager)
-        # Check the expected even if not ideal behavior occurs
-        self.assertIsInstance(OrderCustomManager.objects.all(), CTEQuerySet)
 
     def test_cte_queryset_with_from_queryset(self):
         self.assertEqual(type(OrderFromLT40.objects.all()), LT40QuerySet)

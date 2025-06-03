@@ -9,7 +9,7 @@ from .join import QJoin, INNER
 from .meta import CTEColumnRef, CTEColumns
 from .query import CTEQuery
 
-__all__ = ["CTE", "with_cte", "CTEManager", "CTEQuerySet"]
+__all__ = ["CTE", "with_cte"]
 
 
 def with_cte(*ctes, select):
@@ -24,6 +24,9 @@ def with_cte(*ctes, select):
         select = select.queryset()
     elif not isinstance(select, QuerySet):
         select = select._default_manager.all()
+    if not isinstance(select.query, CTEQuery):
+        select.query.__class__ = CTEQuery
+        select.query._with_ctes = []
     select.query._with_ctes.extend(ctes)
     return select
 

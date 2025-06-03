@@ -5,7 +5,7 @@ from django.test import TestCase
 
 from django_cte import CTE, with_cte
 
-from .models import Order, OrderPlainManager
+from .models import Order
 
 
 class TestCTECombinators(TestCase):
@@ -85,7 +85,7 @@ class TestCTECombinators(TestCase):
             ).annotate(region_total=one.col.total)
         )
         plain_mars = (
-            OrderPlainManager.objects.filter(region_id="mars")
+            Order.objects.filter(region_id="mars")
             .annotate(region_total=Value(0))
         )
         # Note: this does not work in the opposite order. A CTE query
