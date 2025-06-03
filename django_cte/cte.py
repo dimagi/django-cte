@@ -128,7 +128,7 @@ class With(object):
     def _resolve_ref(self, name):
         selected = getattr(self.query, "selected", None)
         if selected and name in selected and name not in self.query.annotations:
-            return Ref(name, self.query)
+            return Ref(name, self.query.resolve_ref(name))
         return self.query.resolve_ref(name)
 
 

@@ -640,3 +640,36 @@ class TestCTE(TestCase):
             {'pk': 11},
             {'pk': 12},
         ])
+
+    def test_django52_resolve_ref_regression(self):
+        cte = With(
+            Order.objects.annotate(
+                pnt_id=F("region__parent_id"),
+                region_name=F("region__name"),
+            ).values(
+                # important: more than one query.select field
+                "region_id",
+                "amount",
+                # important: more than one query.annotations field
+                "pnt_id",
+                "region_name",
+            )
+        )
+        qs = (
+            cte.queryset()
+            .with_cte(cte)
+            .values(
+                amt=cte.col.amount,
+                pnt_id=cte.col.pnt_id,
+                region_name=cte.col.region_name,
+            )
+            .filter(region_id="earth")
+            .order_by("amount")
+        )
+        print(qs.query)
+        self.assertEqual(list(qs), [
+            {'amt': 30, 'region_name': 'earth', 'pnt_id': 'sun'},
+            {'amt': 31, 'region_name': 'earth', 'pnt_id': 'sun'},
+            {'amt': 32, 'region_name': 'earth', 'pnt_id': 'sun'},
+            {'amt': 33, 'region_name': 'earth', 'pnt_id': 'sun'},
+        ])
