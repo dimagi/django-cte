@@ -47,6 +47,8 @@ jobs:
         exclude:
         - {python: '3.9', django: 'Django~=5.1.0'}
         - {python: '3.9', django: 'Django~=5.2.0'}
+    env:
+      allowed_python_failure: '3.14'
     services:
       postgres:
         image: postgres:latest
@@ -83,5 +85,6 @@ jobs:
             "PORT":"5432"
           }
       run: .venv/bin/pytest -v
+      continue-on-error: ${{ matrix.python == env.allowed_python_failure }}
     - name: Check style
       run: .venv/bin/ruff check
