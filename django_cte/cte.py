@@ -113,8 +113,7 @@ class With(object):
             qs._iterable_class = ValuesIterable
         for alias in getattr(cte_query, "selected", None) or ():
             if alias not in cte_query.annotations:
-                field = cte_query.resolve_ref(alias).output_field
-                col = CTEColumnRef(alias, self.name, field)
+                col = Ref(alias, cte_query.resolve_ref(alias))
                 query.add_annotation(col, alias)
         if cte_query.annotations:
             for alias, value in cte_query.annotations.items():
