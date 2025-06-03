@@ -1,3 +1,5 @@
+from copy import copy
+
 from django.db.models import Manager
 from django.db.models.expressions import Ref
 from django.db.models.query import Q, QuerySet, ValuesIterable
@@ -145,6 +147,13 @@ class CTE:
         if selected and name in selected and name not in self.query.annotations:
             return Ref(name, self.query.resolve_ref(name))
         return self.query.resolve_ref(name)
+
+    def resolve_expression(self, *args, **kw):
+        if self.query is None:
+            raise ValueError("Cannot resolve recursive CTE without a query.")
+        clone = copy(self)
+        clone.query = clone.query.resolve_expression(*args, **kw)
+        return clone
 
 
 def With(*args, **kw):

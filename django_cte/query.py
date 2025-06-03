@@ -9,7 +9,6 @@ from django.db.models.sql.compiler import (
 )
 from django.db.models.sql.constants import LOUTER
 
-from .expressions import CTESubqueryResolver
 from .join import QJoin
 
 
@@ -27,6 +26,14 @@ class CTEQuery(Query):
             self._with_ctes = other._with_ctes[:]
         return super(CTEQuery, self).combine(other, connector)
 
+    def resolve_expression(self, *args, **kwargs):
+        clone = super().resolve_expression(*args, **kwargs)
+        clone._with_ctes = [
+            cte.resolve_expression(*args, **kwargs)
+            for cte in clone._with_ctes
+        ]
+        return clone
+
     def get_compiler(self, using=None, connection=None, *args, **kwargs):
         """ Overrides the Query method get_compiler in order to return
             a CTECompiler.
@@ -43,10 +50,6 @@ class CTEQuery(Query):
         # Instantiate the custom compiler.
         klass = COMPILER_TYPES.get(self.__class__, CTEQueryCompiler)
         return klass(self, connection, using, *args, **kwargs)
-
-    def add_annotation(self, annotation, *args, **kw):
-        annotation = CTESubqueryResolver(annotation)
-        super(CTEQuery, self).add_annotation(annotation, *args, **kw)
 
     def __chain(self, _name, klass=None, *args, **kwargs):
         klass = QUERY_TYPES.get(klass, self.__class__)
