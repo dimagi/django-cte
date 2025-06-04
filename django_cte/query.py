@@ -40,14 +40,10 @@ class CTEQuery(Query):
         """
         # Copy the body of this method from Django except the final
         # return statement. We will ignore code coverage for this.
-        if using is None and connection is None:  # pragma: no cover
+        if using is None and connection is None:
             raise ValueError("Need either using or connection")
         if using:
             connection = connections[using]
-        # Check that the compiler will be able to execute the query
-        for alias, aggregate in self.annotation_select.items():
-            connection.ops.check_expression_support(aggregate)
-        # Instantiate the custom compiler.
         klass = COMPILER_TYPES.get(self.__class__, CTEQueryCompiler)
         return klass(self, connection, using, *args, **kwargs)
 
