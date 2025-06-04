@@ -11,7 +11,7 @@ class CTEQuery(Query):
     """A Query which processes SQL compilation through the CTE compiler"""
 
     def __init__(self, *args, **kwargs):
-        super(CTEQuery, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self._with_ctes = []
 
     def combine(self, other, connector):
@@ -19,7 +19,7 @@ class CTEQuery(Query):
             if self._with_ctes:
                 raise TypeError("cannot merge queries with CTEs on both sides")
             self._with_ctes = other._with_ctes[:]
-        return super(CTEQuery, self).combine(other, connector)
+        return super().combine(other, connector)
 
     def resolve_expression(self, *args, **kwargs):
         clone = super().resolve_expression(*args, **kwargs)
@@ -32,14 +32,11 @@ class CTEQuery(Query):
     def get_compiler(self, *args, **kwargs):
         return jit_mixin(super().get_compiler(*args, **kwargs), CTECompiler)
 
-    def __chain(self, _name, klass=None, *args, **kwargs):
+    def chain(self, klass=None):
         klass = QUERY_TYPES.get(klass, self.__class__)
-        clone = getattr(super(CTEQuery, self), _name)(klass, *args, **kwargs)
+        clone = super().chain(klass)
         clone._with_ctes = self._with_ctes[:]
         return clone
-
-    def chain(self, klass=None):
-        return self.__chain("chain", klass)
 
 
 def generate_cte_sql(connection, query, as_sql):
