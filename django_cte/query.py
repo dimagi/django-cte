@@ -1,9 +1,9 @@
 import django
 from django.core.exceptions import EmptyResultSet
-from django.db import connections
 from django.db.models.sql import DeleteQuery, Query, UpdateQuery
 from django.db.models.sql.constants import LOUTER
 
+from .jitmixin import JITMixin, jit_mixin
 from .join import QJoin
 
 
@@ -29,20 +29,8 @@ class CTEQuery(Query):
         ]
         return clone
 
-    def get_compiler(self, using=None, connection=None, *args, **kwargs):
-        """ Overrides the Query method get_compiler in order to return
-            a CTECompiler.
-        """
-        # Copy the body of this method from Django except the final
-        # return statement. We will ignore code coverage for this.
-        if using is None and connection is None:
-            raise ValueError("Need either using or connection")
-        if using:
-            connection = connections[using]
-
-        compiler_class = connection.ops.compiler(self.compiler)
-        cte_compiler = mixin_class(CTECompiler, compiler_class)
-        return cte_compiler(self, connection, using, *args, **kwargs)
+    def get_compiler(self, *args, **kwargs):
+        return jit_mixin(super().get_compiler(*args, **kwargs), CTECompiler)
 
     def __chain(self, _name, klass=None, *args, **kwargs):
         klass = QUERY_TYPES.get(klass, self.__class__)
@@ -146,32 +134,32 @@ QUERY_TYPES = {
 
 def _ignore_with_col_aliases(cte_query):
     if getattr(cte_query, "combined_queries", None):
-        for query in cte_query.combined_queries:
-            query.ignore_with_col_aliases = True
+        cte_query.combined_queries = tuple(
+            jit_mixin(q, NoAliasQuery) for q in cte_query.combined_queries
+        )
 
 
-class CTECompiler:  # mixin for django.db.models.sql.compiler.SQLCompiler
+class CTECompiler(JITMixin):
+    """Mixin for django.db.models.sql.compiler.SQLCompiler"""
+    _jit_mixin_prefix = "CTE"
 
     def as_sql(self, *args, **kwargs):
         def _as_sql():
             return super(CTECompiler, self).as_sql(*args, **kwargs)
         return generate_cte_sql(self.connection, self.query, _as_sql)
 
-    def get_select(self, **kw):
-        if kw.get("with_col_aliases") \
-                and getattr(self.query, "ignore_with_col_aliases", False):
-            kw.pop("with_col_aliases")
+
+class NoAliasQuery(JITMixin):
+    """Mixin for django.db.models.sql.compiler.Query"""
+    _jit_mixin_prefix = "NoAlias"
+
+    def get_compiler(self, *args, **kwargs):
+        return jit_mixin(super().get_compiler(*args, **kwargs), NoAliasCompiler)
+
+
+class NoAliasCompiler(JITMixin):
+    """Mixin for django.db.models.sql.compiler.SQLCompiler"""
+    _jit_mixin_prefix = "NoAlias"
+
+    def get_select(self, *, with_col_aliases=False, **kw):
         return super().get_select(**kw)
-
-
-def mixin_class(mixin, base_class):
-    if issubclass(base_class, mixin):
-        return base_class
-    mixed = _mixin_cache.get(base_class)
-    if mixed is None:
-        name = f"{mixin.__name__}{base_class.__name__}"
-        mixed = _mixin_cache[base_class] = type(name, (mixin, base_class), {})
-    return mixed
-
-
-_mixin_cache = {}
