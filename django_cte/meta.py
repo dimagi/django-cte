@@ -87,7 +87,7 @@ class CTEColumnRef(Expression):
             clone._alias = self._alias or query.table_map.get(
                 self.cte_name, [self.cte_name])[0]
             return clone
-        return super(CTEColumnRef, self).resolve_expression(
+        return super().resolve_expression(
             query, allow_joins, reuse, summarize, for_save)
 
     def relabeled_clone(self, change_map):
@@ -95,7 +95,7 @@ class CTEColumnRef(Expression):
             self.cte_name not in change_map
             and self._alias not in change_map
         ):
-            return super(CTEColumnRef, self).relabeled_clone(change_map)
+            return super().relabeled_clone(change_map)
 
         clone = self.copy()
         if self.cte_name in change_map:
