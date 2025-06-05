@@ -1,15 +1,19 @@
 import django
 from django.core.exceptions import EmptyResultSet
-from django.db.models.sql import DeleteQuery, Query, UpdateQuery
 from django.db.models.sql.constants import LOUTER
 
 from .jitmixin import JITMixin, jit_mixin
 from .join import QJoin
 
+# NOTE: it is currently not possible to execute delete queries that
+# reference CTEs without patching `QuerySet.delete` (Django method)
+# to call `self.query.chain(sql.DeleteQuery)` instead of
+# `sql.DeleteQuery(self.model)`
 
-class CTEQuery(Query):
-    """A Query which processes SQL compilation through the CTE compiler"""
 
+class CTEQuery(JITMixin):
+    """A Query mixin that processes SQL compilation through a CTE compiler"""
+    _jit_mixin_prefix = "CTE"
     _with_ctes = ()
 
     @property
@@ -55,8 +59,7 @@ class CTEQuery(Query):
         return jit_mixin(super().get_compiler(*args, **kwargs), CTECompiler)
 
     def chain(self, klass=None):
-        klass = QUERY_TYPES.get(klass, self.__class__)
-        clone = super().chain(klass)
+        clone = jit_mixin(super().chain(klass), CTEQuery)
         clone._with_ctes = self._with_ctes
         return clone
 
@@ -130,25 +133,6 @@ def get_cte_query_template(cte):
     if cte.materialized:
         return "{name} AS MATERIALIZED ({query})"
     return "{name} AS ({query})"
-
-
-class CTEUpdateQuery(UpdateQuery, CTEQuery):
-    pass
-
-
-class CTEDeleteQuery(DeleteQuery, CTEQuery):
-    # NOTE: it is currently not possible to execute delete queries that
-    # reference CTEs without patching `QuerySet.delete` (Django method)
-    # to call `self.query.chain(sql.DeleteQuery)` instead of
-    # `sql.DeleteQuery(self.model)`
-    pass
-
-
-QUERY_TYPES = {
-    Query: CTEQuery,
-    UpdateQuery: CTEUpdateQuery,
-    DeleteQuery: CTEDeleteQuery,
-}
 
 
 def _ignore_with_col_aliases(cte_query):
