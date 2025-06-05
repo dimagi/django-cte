@@ -26,8 +26,7 @@ def with_cte(*ctes, select):
         select = select._default_manager.all()
     if not isinstance(select.query, CTEQuery):
         select.query.__class__ = CTEQuery
-        select.query._with_ctes = []
-    select.query._with_ctes.extend(ctes)
+    select.query._with_ctes += ctes
     return select
 
 
@@ -185,7 +184,7 @@ class CTEQuerySet(QuerySet):
         can be referenced in annotations, filters, etc.
         """
         qs = self._clone()
-        qs.query._with_ctes.append(cte)
+        qs.query._with_ctes += cte,
         return qs
 
     def as_manager(cls):
