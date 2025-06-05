@@ -1,10 +1,11 @@
 from copy import copy
 
-from django.db.models import Manager
+from django.db.models import Manager, sql
 from django.db.models.expressions import Ref
 from django.db.models.query import Q, QuerySet, ValuesIterable
 from django.db.models.sql.datastructures import BaseTable
 
+from .jitmixin import jit_mixin
 from .join import QJoin, INNER
 from .meta import CTEColumnRef, CTEColumns
 from .query import CTEQuery
@@ -24,8 +25,7 @@ def with_cte(*ctes, select):
         select = select.queryset()
     elif not isinstance(select, QuerySet):
         select = select._default_manager.all()
-    if not isinstance(select.query, CTEQuery):
-        select.query.__class__ = CTEQuery
+    jit_mixin(select.query, CTEQuery)
     select.query._with_ctes += ctes
     return select
 
@@ -124,7 +124,7 @@ class CTE:
         cte_query = self.query
         qs = cte_query.model._default_manager.get_queryset()
 
-        query = CTEQuery(cte_query.model)
+        query = jit_mixin(sql.Query(cte_query.model), CTEQuery)
         query.join(BaseTable(self.name, None))
         query.default_cols = cte_query.default_cols
         query.deferred_loading = cte_query.deferred_loading
@@ -172,9 +172,8 @@ class CTEQuerySet(QuerySet):
     def __init__(self, model=None, query=None, using=None, hints=None):
         # Only create an instance of a Query if this is the first invocation in
         # a query chain.
-        if query is None:
-            query = CTEQuery(model)
         super(CTEQuerySet, self).__init__(model, query, using, hints)
+        jit_mixin(self.query, CTEQuery)
 
     def with_cte(self, cte):
         """Add a Common Table Expression to this queryset
