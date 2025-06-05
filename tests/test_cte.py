@@ -1,11 +1,11 @@
-from unittest import SkipTest
-
+import pytest
 from django.db.models import IntegerField, TextField
 from django.db.models.aggregates import Count, Max, Min, Sum
 from django.db.models.expressions import (
     Exists, ExpressionWrapper, F, OuterRef, Subquery,
 )
 from django.db.models.sql.constants import LOUTER
+from django.db.utils import OperationalError, ProgrammingError
 from django.test import TestCase
 
 from django_cte import CTE, with_cte
@@ -350,12 +350,14 @@ class TestCTE(TestCase):
             ('mars', 0),
         })
 
+    @pytest.mark.xfail(
+        reason="this test will not work until `QuerySet.delete` "
+            "(Django method) calls `self.query.chain(sql.DeleteQuery)` "
+            "instead of `sql.DeleteQuery(self.model)`",
+        raises=(OperationalError, ProgrammingError),
+        strict=True,
+    )
     def test_delete_cte_query(self):
-        raise SkipTest(
-            "this test will not work until `QuerySet.delete` (Django method) "
-            "calls `self.query.chain(sql.DeleteQuery)` instead of "
-            "`sql.DeleteQuery(self.model)`"
-        )
         cte = CTE(
             Order.objects
             .values(region_parent=F("region__parent_id"))
