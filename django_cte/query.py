@@ -14,12 +14,36 @@ class CTEQuery(Query):
         super().__init__(*args, **kwargs)
         self._with_ctes = []
 
-    def combine(self, other, connector):
-        if other._with_ctes:
-            if self._with_ctes:
-                raise TypeError("cannot merge queries with CTEs on both sides")
-            self._with_ctes = other._with_ctes[:]
-        return super().combine(other, connector)
+    @property
+    def combined_queries(self):
+        return self.__dict__.get("combined_queries", ())
+
+    @combined_queries.setter
+    def combined_queries(self, queries):
+        ctes = []
+        seen = {cte.name: cte for cte in self._with_ctes}
+        for query in queries:
+            for cte in getattr(query, "_with_ctes", ()):
+                if seen.get(cte.name) is cte:
+                    continue
+                if cte.name in seen:
+                    raise ValueError(
+                        f"Found two or more CTEs named '{cte.name}'. "
+                        "Hint: assign a unique name to each CTE."
+                    )
+                ctes.append(cte)
+                seen[cte.name] = cte
+
+        if seen:
+            def without_ctes(query):
+                if getattr(query, "_with_ctes", None):
+                    query = query.clone()
+                    query._with_ctes = []
+                return query
+
+            self._with_ctes += tuple(ctes)
+            queries = tuple(without_ctes(q) for q in queries)
+        self.__dict__["combined_queries"] = queries
 
     def resolve_expression(self, *args, **kwargs):
         clone = super().resolve_expression(*args, **kwargs)
