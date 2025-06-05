@@ -10,9 +10,7 @@ from .join import QJoin
 class CTEQuery(Query):
     """A Query which processes SQL compilation through the CTE compiler"""
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._with_ctes = []
+    _with_ctes = ()
 
     @property
     def combined_queries(self):
@@ -38,7 +36,7 @@ class CTEQuery(Query):
             def without_ctes(query):
                 if getattr(query, "_with_ctes", None):
                     query = query.clone()
-                    query._with_ctes = []
+                    del query._with_ctes
                 return query
 
             self._with_ctes += tuple(ctes)
@@ -47,10 +45,10 @@ class CTEQuery(Query):
 
     def resolve_expression(self, *args, **kwargs):
         clone = super().resolve_expression(*args, **kwargs)
-        clone._with_ctes = [
+        clone._with_ctes = tuple(
             cte.resolve_expression(*args, **kwargs)
             for cte in clone._with_ctes
-        ]
+        )
         return clone
 
     def get_compiler(self, *args, **kwargs):
@@ -59,7 +57,7 @@ class CTEQuery(Query):
     def chain(self, klass=None):
         klass = QUERY_TYPES.get(klass, self.__class__)
         clone = super().chain(klass)
-        clone._with_ctes = self._with_ctes[:]
+        clone._with_ctes = self._with_ctes
         return clone
 
 
