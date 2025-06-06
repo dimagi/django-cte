@@ -8,48 +8,32 @@ for the duration of the query it is attached to. django-cte allows common table
 expressions to be attached to normal Django ORM queries.
 
 
-## Prerequisite: A Model with a "CTEManager"
-
-The custom manager class, `CTEManager`, constructs `CTEQuerySet`s, which have
-all of the same features as normal `QuerySet`s and also support CTE queries.
-
-```py
-from django_cte import CTEManager
-
-class Order(Model):
-    objects = CTEManager()
-    id = AutoField(primary_key=True)
-    region = ForeignKey("Region", on_delete=CASCADE)
-    amount = IntegerField(default=0)
-
-    class Meta:
-        db_table = "orders"
-```
-
-
 ## Simple Common Table Expressions
 
-Simple CTEs are constructed using `With(...)`. A CTE can be joined to a model or
-other `CTEQuerySet` using its `join(...)` method, which creates a new queryset
-with a `JOIN` and `ON` condition. Finally, the CTE is added to the resulting
-queryset using `with_cte(cte)`, which adds the `WITH` expression before the
-main `SELECT` query.
+See [Appendix A](#appendix-a-model-definitions-used-in-sample-code) for model
+definitions used in sample code.
+
+Simple CTEs are constructed using `CTE(...)`. A CTE is added to a queryset using
+`with_cte(cte, select=queryset)`, which adds the `WITH` expression before the
+main `SELECT` query. A CTE can be joined to a model or other `QuerySet` using
+its `<CTE>.join(...)` method, which creates a new queryset with a `JOIN` and
+`ON` condition.
 
 ```py
-from django_cte import With
+from django_cte import CTE, with_cte
 
-cte = With(
+cte = CTE(
     Order.objects
     .values("region_id")
     .annotate(total=Sum("amount"))
 )
 
-orders = (
-    # FROM orders INNER JOIN cte ON orders.region_id = cte.region_id
-    cte.join(Order, region=cte.col.region_id)
+orders = with_cte(
+    # WITH cte ...
+    cte,
 
-    # Add `WITH ...` before `SELECT ... FROM orders ...`
-    .with_cte(cte)
+    # SELECT ... FROM orders INNER JOIN cte ON orders.region_id = cte.region_id
+    select=cte.join(Order, region=cte.col.region_id)
 
     # Annotate each Order with a "region_total"
     .annotate(region_total=cte.col.total)
@@ -78,7 +62,7 @@ FROM "orders"
 INNER JOIN "cte" ON "orders"."region_id" = "cte"."region_id"
 ```
 
-The `orders` query is a query set containing annotated `Order` objects, just as
+The `orders` query is a queryset containing annotated `Order` objects, just as
 you would get from a query like `Order.objects.annotate(region_total=...)`. Each
 `Order` object will be annotated with a `region_total` attribute, which is
 populated with the value of the corresponding total from the joined CTE query.
@@ -93,19 +77,9 @@ recursive CTEs to be included in the WITH block.
 ## Recursive Common Table Expressions
 
 Recursive CTE queries allow fundamentally new types of queries that are
-not otherwise possible. First, a model for the example.
+not otherwise possible.
 
-```py
-class Region(Model):
-    objects = CTEManager()
-    name = TextField(primary_key=True)
-    parent = ForeignKey("self", null=True, on_delete=CASCADE)
-
-    class Meta:
-        db_table = "region"
-```
-
-Recursive CTEs are constructed using `With.recursive()`, which takes as its
+Recursive CTEs are constructed using `CTE.recursive()`, which takes as its
 first argument a function that constructs and returns a recursive query.
 Recursive queries have two elements: first a non-recursive query element, and
 second a recursive query element. The second is typically attached to the first
@@ -133,11 +107,11 @@ def make_regions_cte(cte):
         all=True,
     )
 
-cte = With.recursive(make_regions_cte)
+cte = CTE.recursive(make_regions_cte)
 
-regions = (
-    cte.join(Region, name=cte.col.name)
-    .with_cte(cte)
+regions = with_cte(
+    cte,
+    select=cte.join(Region, name=cte.col.name)
     .annotate(
         path=cte.col.path,
         depth=cte.col.depth,
@@ -184,9 +158,9 @@ ORDER BY "path" ASC
 ## Named Common Table Expressions
 
 It is possible to add more than one CTE to a query. To do this, each CTE must
-have a unique name. `With(queryset)` returns a CTE with the name `'cte'` by
-default, but that can be overridden: `With(queryset, name='custom')` or
-`With.recursive(make_queryset, name='custom')`. This allows each CTE to be
+have a unique name. `CTE(queryset)` returns a CTE with the name `'cte'` by
+default, but that can be overridden: `CTE(queryset, name='custom')` or
+`CTE.recursive(make_queryset, name='custom')`. This allows each CTE to be
 referenced uniquely within a single query.
 
 Also note that a CTE may reference other CTEs in the same query.
@@ -208,9 +182,9 @@ def make_root_mapping(rootmap):
         ),
         all=True,
     )
-rootmap = With.recursive(make_root_mapping, name="rootmap")
+rootmap = CTE.recursive(make_root_mapping, name="rootmap")
 
-totals = With(
+totals = CTE(
     rootmap.join(Order, region_id=rootmap.col.name)
     .values(
         root=rootmap.col.root,
@@ -221,11 +195,12 @@ totals = With(
     name="totals",
 )
 
-root_regions = (
-    totals.join(Region, name=totals.col.root)
-    # Important: add both CTEs to the final query
-    .with_cte(rootmap)
-    .with_cte(totals)
+root_regions = with_cte(
+    # Important: add both CTEs to the query
+    rootmap,
+    totals,
+
+    select=totals.join(Region, name=totals.col.root)
     .annotate(
         # count of orders in this region and all subregions
         orders_count=totals.col.orders_count,
@@ -276,16 +251,16 @@ INNER JOIN "totals" ON "region"."name" = "totals"."root"
 
 Sometimes it is useful to construct queries where the final `FROM` clause
 contains only common table expression(s). This is possible with
-`With(...).queryset()`.
+`CTE(...).queryset()`.
 
 Each returned row may be a model object:
 
 ```py
-cte = With(
+cte = CTE(
     Order.objects
     .annotate(region_parent=F("region__parent_id")),
 )
-orders = cte.queryset().with_cte(cte)
+orders = with_cte(cte, select=cte.queryset())
 ```
 
 And the resulting SQL:
@@ -311,7 +286,7 @@ FROM "cte"
 It is also possible to do the same with `values(...)` queries:
 
 ```py
-cte = With(
+cte = CTE(
     Order.objects
     .values(
         "region_id",
@@ -319,7 +294,7 @@ cte = With(
     )
     .distinct()
 )
-values = cte.queryset().with_cte(cte).filter(region_parent__isnull=False)
+values = with_cte(cte, select=cte).filter(region_parent__isnull=False)
 ```
 
 Which produces this SQL:
@@ -339,55 +314,30 @@ FROM "cte"
 WHERE "cte"."region_parent" IS NOT NULL
 ```
 
-
-## Custom QuerySets and Managers
-
-Custom `QuerySet`s that will be used in CTE queries should be derived from
-`CTEQuerySet`.
-
-```py
-class LargeOrdersQuerySet(CTEQuerySet):
-    def big_amounts(self):
-        return self.filter(amount__gt=100)
-
-
-class Order(Model):
-    amount = models.IntegerField()
-    large = LargeOrdersQuerySet.as_manager()
-```
-
-Custom `CTEQuerySet`s can also be used with custom `CTEManager`s.
-
-```py
-class CustomManager(CTEManager):
-    ...
-
-
-class Order(Model):
-    large = CustomManager.from_queryset(LargeOrdersQuerySet)()
-    objects = CustomManager()
-```
+You may have noticed that when a CTE is passed to the `select=...` argument as
+in `with_cte(cte, select=cte)`, the `.queryset()` call is optional and may be
+omitted.
 
 
 ## Experimental: Left Outer Join
 
 Django does not provide precise control over joins, but there is an experimental
 way to perform a `LEFT OUTER JOIN` with a CTE query using the `_join_type`
-keyword argument of `With.join(...)`.
+keyword argument of `CTE.join(...)`.
 
 ```py
 from django.db.models.sql.constants import LOUTER
 
-totals = With(
+totals = CTE(
     Order.objects
     .values("region_id")
     .annotate(total=Sum("amount"))
     .filter(total__gt=100)
 )
-orders = (
-    totals
+orders = with_cte(
+    totals,
+    select=totals
     .join(Order, region=totals.col.region_id, _join_type=LOUTER)
-    .with_cte(totals)
     .annotate(region_total=totals.col.total)
 )
 ```
@@ -420,12 +370,13 @@ produce the desired SQL.
 
 ## Materialized CTE
 
-Both PostgreSQL 12+ and sqlite 3.35+ supports `MATERIALIZED` keyword for CTE queries.
-To enforce using of this keyword add `materialized` as a parameter of `With(..., materialized=True)`.
+Both PostgreSQL 12+ and sqlite 3.35+ supports `MATERIALIZED` keyword for CTE
+queries. To enforce using of this keyword add `materialized` as a parameter of
+`CTE(..., materialized=True)`.
 
 
 ```py
-cte = With(
+cte = CTE(
     Order.objects.values('id'),
     materialized=True
 )
@@ -457,7 +408,7 @@ A short example:
 from django.db.models import IntegerField, TextField
 from django_cte.raw import raw_cte_sql
 
-cte = With(raw_cte_sql(
+cte = CTE(raw_cte_sql(
     """
     SELECT region_id, AVG(amount) AS avg_order
     FROM orders
@@ -470,11 +421,11 @@ cte = With(raw_cte_sql(
         "avg_order": IntegerField(),
     },
 ))
-moon_avg = (
-    cte
+moon_avg = with_cte(
+    cte,
+    select=cte
     .join(Region, name=cte.col.region_id)
     .annotate(avg_order=cte.col.avg_order)
-    .with_cte(cte)
 )
 ```
 
@@ -507,3 +458,33 @@ in the tests:
 - [`test_cte.py`](https://github.com/dimagi/django-cte/blob/main/tests/test_cte.py)
 - [`test_recursive.py`](https://github.com/dimagi/django-cte/blob/main/tests/test_recursive.py)
 - [`test_raw.py`](https://github.com/dimagi/django-cte/blob/main/tests/test_raw.py)
+
+
+## Appendix A: Model definitions used in sample code
+
+```py
+class Order(Model):
+    id = AutoField(primary_key=True)
+    region = ForeignKey("Region", on_delete=CASCADE)
+    amount = IntegerField(default=0)
+
+    class Meta:
+        db_table = "orders"
+
+
+class Region(Model):
+    name = TextField(primary_key=True)
+    parent = ForeignKey("self", null=True, on_delete=CASCADE)
+
+    class Meta:
+        db_table = "region"
+```
+
+
+## Appendix B: django-cte v1 documentation (DEPRECATED)
+
+The syntax for constructing CTE queries changed slightly in django-cte 2.0. The
+most important change is that a custom model manager is no longer required on
+models used to construct CTE queries. The documentation has been updated to use
+v2 syntax, but the [documentation for v1](https://github.com/dimagi/django-cte/blob/v1.3.3/docs/index.md)
+can be found on Github if needed.
