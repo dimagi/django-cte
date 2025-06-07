@@ -9,6 +9,7 @@ from .jitmixin import jit_mixin
 from .join import QJoin, INNER
 from .meta import CTEColumnRef, CTEColumns
 from .query import CTEQuery
+from ._deprecated import deprecated
 
 __all__ = ["CTE", "with_cte"]
 
@@ -158,14 +159,17 @@ class CTE:
         return clone
 
 
-def With(*args, **kw):
-    """DEPRECATED: Use `CTE()` instead."""
-    return CTE(*args, **kw)
+@deprecated("Use `django_cte.CTE` instead.")
+class With(CTE):
+
+    @staticmethod
+    @deprecated("Use `django_cte.CTE.recursive` instead.")
+    def recursive(*args, **kw):
+        return CTE.recursive(*args, **kw)
 
 
-With.recursive = CTE.recursive
-
-
+@deprecated("CTEQuerySet is deprecated. "
+            "CTEs can now be applied to any queryset using `with_cte()`")
 class CTEQuerySet(QuerySet):
     """QuerySet with support for Common Table Expressions"""
 
@@ -175,13 +179,8 @@ class CTEQuerySet(QuerySet):
         super(CTEQuerySet, self).__init__(model, query, using, hints)
         jit_mixin(self.query, CTEQuery)
 
+    @deprecated("Use `django_cte.with_cte(cte, select=...)` instead.")
     def with_cte(self, cte):
-        """Add a Common Table Expression to this queryset
-
-        The CTE `WITH ...` clause will be added to the queryset's SQL
-        output (after other CTEs that have already been added) so it
-        can be referenced in annotations, filters, etc.
-        """
         qs = self._clone()
         qs.query._with_ctes += cte,
         return qs
@@ -196,6 +195,8 @@ class CTEQuerySet(QuerySet):
     as_manager = classmethod(as_manager)
 
 
+@deprecated("CTEMAnager is deprecated. "
+            "CTEs can now be applied to any queryset using `with_cte()`")
 class CTEManager(Manager.from_queryset(CTEQuerySet)):
     """Manager for models that perform CTE queries"""
 
