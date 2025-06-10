@@ -2,6 +2,7 @@ from django.db.models import (
     CASCADE,
     Manager,
     Model,
+    QuerySet,
     AutoField,
     CharField,
     ForeignKey,
@@ -9,33 +10,20 @@ from django.db.models import (
     TextField,
 )
 
-from django_cte import CTEManager, CTEQuerySet
 
-
-class LT40QuerySet(CTEQuerySet):
+class LT40QuerySet(QuerySet):
 
     def lt40(self):
         return self.filter(amount__lt=40)
 
 
-class LT30QuerySet(CTEQuerySet):
-
-    def lt30(self):
-        return self.filter(amount__lt=30)
-
-
-class LT25QuerySet(CTEQuerySet):
+class LT25QuerySet(QuerySet):
 
     def lt25(self):
         return self.filter(amount__lt=25)
 
 
-class LTManager(CTEManager):
-    pass
-
-
 class Region(Model):
-    objects = CTEManager()
     name = TextField(primary_key=True)
     parent = ForeignKey("self", null=True, on_delete=CASCADE)
 
@@ -52,7 +40,6 @@ class User(Model):
 
 
 class Order(Model):
-    objects = CTEManager()
     id = AutoField(primary_key=True)
     region = ForeignKey(Region, on_delete=CASCADE)
     amount = IntegerField(default=0)
@@ -65,35 +52,16 @@ class Order(Model):
 class OrderFromLT40(Order):
     class Meta:
         proxy = True
-    objects = CTEManager.from_queryset(LT40QuerySet)()
-
-
-class OrderLT40AsManager(Order):
-    class Meta:
-        proxy = True
-    objects = LT40QuerySet.as_manager()
+    objects = Manager.from_queryset(LT40QuerySet)()
 
 
 class OrderCustomManagerNQuery(Order):
     class Meta:
         proxy = True
-    objects = LTManager.from_queryset(LT25QuerySet)()
-
-
-class OrderCustomManager(Order):
-    class Meta:
-        proxy = True
-    objects = LTManager()
-
-
-class OrderPlainManager(Order):
-    class Meta:
-        proxy = True
-    objects = Manager()
+    objects = Manager.from_queryset(LT25QuerySet)()
 
 
 class KeyPair(Model):
-    objects = CTEManager()
     key = CharField(max_length=32)
     value = IntegerField(default=0)
     parent = ForeignKey("self", null=True, on_delete=CASCADE)

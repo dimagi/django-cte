@@ -73,7 +73,7 @@ jobs:
       run: |
         uv sync --locked --no-install-package=django
         uv pip install "${{ matrix.django }}"
-    - name: Run tests
+    - name: Run tests on PostgreSQL
       env:
         DB_SETTINGS: >-
           {
@@ -84,6 +84,9 @@ jobs:
             "HOST":"localhost",
             "PORT":"5432"
           }
+      run: .venv/bin/pytest -v
+      continue-on-error: ${{ matrix.python == env.allowed_python_failure }}
+    - name: Run tests on SQLite
       run: .venv/bin/pytest -v
       continue-on-error: ${{ matrix.python == env.allowed_python_failure }}
     - name: Check style

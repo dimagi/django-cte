@@ -3,42 +3,42 @@ from django.db.models import Value
 from django.db.models.aggregates import Sum
 from django.test import TestCase
 
-from django_cte import CTE, with_cte
+from django_cte import With
 
-from .models import Order
+from .models import Order, OrderPlainManager
 
 
 class TestCTECombinators(TestCase):
 
     def test_cte_union_query(self):
-        one = CTE(
+        one = With(
             Order.objects
             .values("region_id")
             .annotate(total=Sum("amount")),
             name="one"
         )
-        two = CTE(
+        two = With(
             Order.objects
             .values("region_id")
             .annotate(total=Sum("amount") * 2),
             name="two"
         )
 
-        earths = with_cte(
-            one,
-            select=one.join(
+        earths = (
+            one.join(
                 Order.objects.filter(region_id="earth"),
                 region=one.col.region_id
             )
+            .with_cte(one)
             .annotate(region_total=one.col.total)
             .values_list("amount", "region_id", "region_total")
         )
-        mars = with_cte(
-            two,
-            select=two.join(
+        mars = (
+            two.join(
                 Order.objects.filter(region_id="mars"),
                 region=two.col.region_id
             )
+            .with_cte(two)
             .annotate(region_total=two.col.total)
             .values_list("amount", "region_id", "region_total")
         )
@@ -71,21 +71,22 @@ class TestCTECombinators(TestCase):
         ])
 
     def test_cte_union_with_non_cte_query(self):
-        one = CTE(
+        one = With(
             Order.objects
             .values("region_id")
             .annotate(total=Sum("amount")),
         )
 
-        earths = with_cte(
-            one,
-            select=one.join(
+        earths = (
+            one.join(
                 Order.objects.filter(region_id="earth"),
                 region=one.col.region_id
-            ).annotate(region_total=one.col.total)
+            )
+            .with_cte(one)
+            .annotate(region_total=one.col.total)
         )
         plain_mars = (
-            Order.objects.filter(region_id="mars")
+            OrderPlainManager.objects.filter(region_id="mars")
             .annotate(region_total=Value(0))
         )
         # Note: this does not work in the opposite order. A CTE query
@@ -105,27 +106,27 @@ class TestCTECombinators(TestCase):
         ])
 
     def test_cte_union_with_duplicate_names(self):
-        cte_sun = CTE(
+        cte_sun = With(
             Order.objects
             .filter(region__parent="sun")
             .values("region_id")
             .annotate(total=Sum("amount")),
         )
-        cte_proxima = CTE(
+        cte_proxima = With(
             Order.objects
             .filter(region__parent="proxima centauri")
             .values("region_id")
             .annotate(total=2 * Sum("amount")),
         )
 
-        orders_sun = with_cte(
-            cte_sun,
-            select=cte_sun.join(Order, region=cte_sun.col.region_id)
+        orders_sun = (
+            cte_sun.join(Order, region=cte_sun.col.region_id)
+            .with_cte(cte_sun)
             .annotate(region_total=cte_sun.col.total)
         )
-        orders_proxima = with_cte(
-            cte_proxima,
-            select=cte_proxima.join(Order, region=cte_proxima.col.region_id)
+        orders_proxima = (
+            cte_proxima.join(Order, region=cte_proxima.col.region_id)
+            .with_cte(cte_proxima)
             .annotate(region_total=cte_proxima.col.total)
         )
 
@@ -134,21 +135,21 @@ class TestCTECombinators(TestCase):
             orders_sun.union(orders_proxima)
 
     def test_cte_union_of_same_cte(self):
-        cte = CTE(
+        cte = With(
             Order.objects
             .filter(region__parent="sun")
             .values("region_id")
             .annotate(total=Sum("amount")),
         )
 
-        orders_big = with_cte(
-            cte,
-            select=cte.join(Order, region=cte.col.region_id)
+        orders_big = (
+            cte.join(Order, region=cte.col.region_id)
+            .with_cte(cte)
             .annotate(region_total=3 * cte.col.total)
         )
-        orders_small = with_cte(
-            cte,
-            select=cte.join(Order, region=cte.col.region_id)
+        orders_small = (
+            cte.join(Order, region=cte.col.region_id)
+            .with_cte(cte)
             .annotate(region_total=cte.col.total)
         )
 
@@ -188,27 +189,27 @@ class TestCTECombinators(TestCase):
         ])
 
     def test_cte_intersection(self):
-        cte_big = CTE(
+        cte_big = With(
             Order.objects
             .values("region_id")
             .annotate(total=Sum("amount")),
             name='big'
         )
-        cte_small = CTE(
+        cte_small = With(
             Order.objects
             .values("region_id")
             .annotate(total=Sum("amount")),
             name='small'
         )
-        orders_big = with_cte(
-            cte_big,
-            select=cte_big.join(Order, region=cte_big.col.region_id)
+        orders_big = (
+            cte_big.join(Order, region=cte_big.col.region_id)
+            .with_cte(cte_big)
             .annotate(region_total=cte_big.col.total)
             .filter(region_total__gte=86)
         )
-        orders_small = with_cte(
-            cte_small,
-            select=cte_small.join(Order, region=cte_small.col.region_id)
+        orders_small = (
+            cte_small.join(Order, region=cte_small.col.region_id)
+            .with_cte(cte_small)
             .annotate(region_total=cte_small.col.total)
             .filter(region_total__lte=123)
         )
@@ -228,27 +229,27 @@ class TestCTECombinators(TestCase):
         ])
 
     def test_cte_difference(self):
-        cte_big = CTE(
+        cte_big = With(
             Order.objects
             .values("region_id")
             .annotate(total=Sum("amount")),
             name='big'
         )
-        cte_small = CTE(
+        cte_small = With(
             Order.objects
             .values("region_id")
             .annotate(total=Sum("amount")),
             name='small'
         )
-        orders_big = with_cte(
-            cte_big,
-            select=cte_big.join(Order, region=cte_big.col.region_id)
+        orders_big = (
+            cte_big.join(Order, region=cte_big.col.region_id)
+            .with_cte(cte_big)
             .annotate(region_total=cte_big.col.total)
             .filter(region_total__gte=86)
         )
-        orders_small = with_cte(
-            cte_small,
-            select=cte_small.join(Order, region=cte_small.col.region_id)
+        orders_small = (
+            cte_small.join(Order, region=cte_small.col.region_id)
+            .with_cte(cte_small)
             .annotate(region_total=cte_small.col.total)
             .filter(region_total__lte=123)
         )
