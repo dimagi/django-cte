@@ -371,7 +371,7 @@ produce the desired SQL.
 ## Materialized CTE
 
 Both PostgreSQL 12+ and sqlite 3.35+ supports `MATERIALIZED` keyword for CTE
-queries. To enforce using of this keyword add `materialized` as a parameter of
+queries. To enforce usage of this keyword add `materialized` as a parameter of
 `CTE(..., materialized=True)`.
 
 

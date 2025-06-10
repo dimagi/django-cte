@@ -79,7 +79,8 @@ class CTE:
     def join(self, model_or_queryset, *filter_q, **filter_kw):
         """Join this CTE to the given model or queryset
 
-        This CTE will be refernced by the returned queryset, but the
+        This CTE will be referenced by the returned queryset, but the
+
         corresponding `WITH ...` statement will not be prepended to the
         queryset's SQL output; use `with_cte(cte, select=cte.join(...))`
         to achieve that outcome.
