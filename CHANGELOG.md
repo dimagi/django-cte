@@ -1,5 +1,35 @@
 # Django CTE change log
 
+## 2.0.0 - 2025-06-16
+
+- **API overhaul**
+  - `With` has been renamed to `CTE`. `With` is deprecated and will be removed
+    in a future version of django-cte.
+  - `with_cte` was moved from a `CTEQuerySet` method to a stand-alone function.
+  - `CTEManager` and `CTEQuerySet` are deprecated and should be removed from
+    code that uses them, as they are no longer necessary. They will be removed
+    in a future version of django-cte.
+  - Reference the [documentation](https://dimagi.github.io/django-cte/) for new
+    usage patterns.
+- **BREAKING:** On Django 5.2 and later, the name specified in
+  `.values('fk_name')` must match the name of the same column referenced by
+  `cte.col.fk_name`—for example, in a join condition. It may end with `_id` or
+  not, but the references must be consistent. This change may require previously
+  working CTE queries to be adjusted when migrating to Django 5.2
+  ([example](https://github.com/dimagi/django-cte/commit/321d92cd8d1edd515c1f5000a3b12c35265aa4f8)).
+- Django 5.0 is EOL and no longer supported.
+- Fixed broken `UNION` and other "combined" queries.
+- Internally, the library has been updated to simplify the code and remove
+  workarounds for old and unsupported versions of Django.
+- Modernized development tooling
+  - Replaced _nosetests_ with _pytest_.
+  - Replaced _setup.py_ with _pyproject.toml_
+  - Replaced _flake8_ with _ruff_.
+  - Replaced _venv/pip_ with _uv_.
+  - Improved Github Actions automation, including automated releases.
+  - Dev versions of django-cte are now published on PyPI, making them easier to
+    test and use before an official release is cut.
+
 ## 1.3.3 - 2024-06-07
 
 - Handle empty result sets in CTEs ([#92](https://github.com/dimagi/django-cte/pull/92)).
