@@ -12,7 +12,6 @@ requires-python = ">= 3.9"
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     'Environment :: Web Environment',
-    'Framework :: Django',
     'Intended Audience :: Developers',
     'Operating System :: OS Independent',
     'Programming Language :: Python',
