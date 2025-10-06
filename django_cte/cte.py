@@ -133,15 +133,15 @@ class CTE:
         if cte_query.values_select:
             query.set_values(cte_query.values_select)
             qs._iterable_class = ValuesIterable
-        for alias in getattr(cte_query, "selected", None) or ():
-            if alias not in cte_query.annotations:
-                col = Ref(alias, cte_query.resolve_ref(alias))
-                query.add_annotation(col, alias)
         if cte_query.annotations:
             for alias, value in cte_query.annotations.items():
                 col = CTEColumnRef(alias, self.name, value.output_field)
                 query.add_annotation(col, alias)
         query.annotation_select_mask = cte_query.annotation_select_mask
+        for alias in getattr(cte_query, "selected", None) or ():
+            if alias not in cte_query.annotations:
+                col = Ref(alias, cte_query.resolve_ref(alias))
+                query.add_annotation(col, alias)
 
         qs.query = query
         return qs
