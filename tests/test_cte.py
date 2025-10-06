@@ -668,3 +668,8 @@ class TestCTE(TestCase):
             {'amt': 32, 'region_name': 'earth', 'pnt_id': 'sun'},
             {'amt': 33, 'region_name': 'earth', 'pnt_id': 'sun'},
         ])
+
+    def test_django52_queryset_regression(self):
+        cte = CTE(Order.objects.values("id", "region_id"))
+        q = cte.queryset()
+        q.values("id", "region_id")  # Raises an exception before the fix
