@@ -58,7 +58,7 @@ class CTE:
         self.col = CTEColumns(self)
 
     def __repr__(self):
-        return "<With {}>".format(self.name)
+        return f"<{type(self).__name__} {self.name}>"
 
     @classmethod
     def recursive(cls, make_cte_queryset, name="cte", materialized=False):
@@ -80,7 +80,6 @@ class CTE:
         """Join this CTE to the given model or queryset
 
         This CTE will be referenced by the returned queryset, but the
-
         corresponding `WITH ...` statement will not be prepended to the
         queryset's SQL output; use `with_cte(cte, select=cte.join(...))`
         to achieve that outcome.
