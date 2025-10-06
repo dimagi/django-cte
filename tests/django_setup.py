@@ -1,6 +1,6 @@
 from django.db import connection
 
-from .models import KeyPair, Region, Order
+from .models import KeyPair, Region, Order, User
 
 is_initialized = False
 
@@ -21,6 +21,8 @@ def destroy_db():
 
 
 def setup_data():
+    admin = User.objects.create(name="admin")
+
     regions = {None: None}
     for name, parent in [
         ("sun", None),
@@ -63,7 +65,7 @@ def setup_data():
         ("proxima centauri b", 11),
         ("proxima centauri b", 12),
     ]:
-        order = Order(amount=amount, region=regions[region])
+        order = Order(amount=amount, region=regions[region], user=admin)
         order.save()
 
     for key, value, parent in [

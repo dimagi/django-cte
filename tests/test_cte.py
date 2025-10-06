@@ -673,3 +673,41 @@ class TestCTE(TestCase):
         cte = CTE(Order.objects.values("id", "region_id"))
         q = cte.queryset()
         q.values("id", "region_id")  # Raises an exception before the fix
+
+    def test_django52_ambiguous_column_names(self):
+        cte = CTE(Order.objects.values("region", "amount", "user_id"))
+        cte2 = CTE(User.objects.annotate(user_id=F("id")), name="cte2")
+        qs = with_cte(
+            cte,
+            cte2,
+            select=cte2.join(cte.queryset(), user_id=cte2.col.user_id)
+            .annotate(user_name=cte2.col.name)
+            .order_by("region", "amount")
+            .values_list("region", "amount", "user_name"),
+        )
+        # Executing this query should not raise a
+        # django.db.utils.OperationalError: ambiguous column name: user_id
+        self.assertEqual(list(qs), [
+            ('earth', 30, "admin"),
+            ('earth', 31, "admin"),
+            ('earth', 32, "admin"),
+            ('earth', 33, "admin"),
+            ('mars', 40, "admin"),
+            ('mars', 41, "admin"),
+            ('mars', 42, "admin"),
+            ('mercury', 10, "admin"),
+            ('mercury', 11, "admin"),
+            ('mercury', 12, "admin"),
+            ('moon', 1, "admin"),
+            ('moon', 2, "admin"),
+            ('moon', 3, "admin"),
+            ('proxima centauri', 2000, "admin"),
+            ('proxima centauri b', 10, "admin"),
+            ('proxima centauri b', 11, "admin"),
+            ('proxima centauri b', 12, "admin"),
+            ('sun', 1000, "admin"),
+            ('venus', 20, "admin"),
+            ('venus', 21, "admin"),
+            ('venus', 22, "admin"),
+            ('venus', 23, "admin"),
+        ])
