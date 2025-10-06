@@ -140,7 +140,8 @@ class CTE:
         query.annotation_select_mask = cte_query.annotation_select_mask
         for alias in getattr(cte_query, "selected", None) or ():
             if alias not in cte_query.annotations:
-                col = Ref(alias, cte_query.resolve_ref(alias))
+                output_field = cte_query.resolve_ref(alias).output_field
+                col = CTEColumnRef(alias, self.name, output_field)
                 query.add_annotation(col, alias)
 
         qs.query = query
