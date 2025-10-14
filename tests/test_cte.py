@@ -1,4 +1,5 @@
 import pytest
+import django
 from django.db.models import IntegerField, TextField
 from django.db.models.aggregates import Count, Max, Min, Sum
 from django.db.models.expressions import (
@@ -744,4 +745,52 @@ class TestCTE(TestCase):
             (1, 'proxima centauri b'),
             (1, 'sun'),
             (1, 'venus'),
+        ])
+
+    @pytest.mark.skipif(django.VERSION < (5, 2), reason="Requires Django 5.2+")
+    def test_queryset_after_values_list(self):
+        cte = CTE(Order.objects.values_list("region", "amount").order_by("region", "amount"))
+        qs = with_cte(cte, select=cte)
+        self.assertEqual(list(qs), [
+            ('earth', 30),
+            ('earth', 31),
+            ('earth', 32),
+            ('earth', 33),
+            ('mars', 40),
+            ('mars', 41),
+            ('mars', 42),
+            ('mercury', 10),
+            ('mercury', 11),
+            ('mercury', 12),
+            ('moon', 1),
+            ('moon', 2),
+            ('moon', 3),
+            ('proxima centauri', 2000),
+            ('proxima centauri b', 10),
+            ('proxima centauri b', 11),
+            ('proxima centauri b', 12),
+            ('sun', 1000),
+            ('venus', 20),
+            ('venus', 21),
+            ('venus', 22),
+            ('venus', 23),
+        ])
+
+    @pytest.mark.skipif(django.VERSION < (5, 2), reason="Requires Django 5.2+")
+    def test_queryset_after_values_list_flat(self):
+        cte = CTE(
+            Order.objects.values_list("region", flat=True)
+            .order_by("region")
+            .distinct()
+        )
+        qs = with_cte(cte, select=cte)
+        self.assertEqual(list(qs), [
+            'earth',
+            'mars',
+            'mercury',
+            'moon',
+            'proxima centauri',
+            'proxima centauri b',
+            'sun',
+            'venus'
         ])
