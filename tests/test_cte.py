@@ -5,7 +5,6 @@ from django.db.models.aggregates import Count, Max, Min, Sum
 from django.db.models.expressions import (
     Exists, ExpressionWrapper, F, OuterRef, Subquery,
 )
-from django.db.models.query import ValuesListIterable
 from django.db.models.sql.constants import LOUTER
 from django.db.utils import OperationalError, ProgrammingError
 from django.test import TestCase
@@ -805,9 +804,6 @@ class TestCTE(TestCase):
             .order_by("region")
         )
         qs = with_cte(cte, select=cte)
-        # Use the `ValuesListIterable` for being able to inspect the order of the fields
-        # in the resulting query
-        qs._iterable_class = ValuesListIterable
         # Ensure the column order of queried fields is the specified one: c, region
         # Before the fix, the order would have been this one: region, c
         self.assertEqual(list(qs), [
@@ -830,9 +826,6 @@ class TestCTE(TestCase):
             .order_by("r")
         )
         qs = with_cte(cte, select=cte)
-        # Use the `ValuesListIterable` for being able to inspect the order of the fields
-        # in the resulting query
-        qs._iterable_class = ValuesListIterable
         # Ensure the column order of queried fields is the specified one: c, r
         # Before the fix, the order would have been this one: r, c
         self.assertEqual(list(qs), [
