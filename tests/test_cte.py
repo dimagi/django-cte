@@ -711,3 +711,14 @@ class TestCTE(TestCase):
             ('venus', 22, "admin"),
             ('venus', 23, "admin"),
         ])
+
+    def test_django52_queryset_aggregates_klass_error(self):
+        cte = CTE(
+            Order.objects.annotate(user_name=F("user__name"))
+            .values("user_name")
+            .annotate(c=Count("user_name"))
+            .values("user_name", "c")
+        )
+        qs = with_cte(cte, select=cte)
+        # Executing the query should not raise TypeError: 'NoneType' object is not subscriptable
+        self.assertEqual(list(qs), [{"user_name": "admin", "c": 22}])
