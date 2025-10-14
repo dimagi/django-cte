@@ -722,3 +722,26 @@ class TestCTE(TestCase):
         qs = with_cte(cte, select=cte)
         # Executing the query should not raise TypeError: 'NoneType' object is not subscriptable
         self.assertEqual(list(qs), [{"user_name": "admin", "c": 22}])
+
+    def test_django52_annotate_model_field_name_after_queryset(self):
+        # Select the `id` field in one CTE
+        cte = CTE(Order.objects.values("id", "region", "user_id"))
+        # In the next query, when querying from the CTE we reassign the `id` field
+        # Previously, this would have thrown an exception
+        qs = (
+            with_cte(cte, select=cte)
+            .annotate(id=F('user_id'))
+            .values_list('id', 'region')
+            .order_by('id', 'region')
+            .distinct()
+        )
+        self.assertEqual(list(qs), [
+            (1, 'earth'),
+            (1, 'mars'),
+            (1, 'mercury'),
+            (1, 'moon'),
+            (1, 'proxima centauri'),
+            (1, 'proxima centauri b'),
+            (1, 'sun'),
+            (1, 'venus'),
+        ])
