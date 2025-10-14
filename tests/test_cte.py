@@ -5,6 +5,7 @@ from django.db.models.aggregates import Count, Max, Min, Sum
 from django.db.models.expressions import (
     Exists, ExpressionWrapper, F, OuterRef, Subquery,
 )
+from django.db.models.query import ValuesListIterable
 from django.db.models.sql.constants import LOUTER
 from django.db.utils import OperationalError, ProgrammingError
 from django.test import TestCase
@@ -793,4 +794,54 @@ class TestCTE(TestCase):
             'proxima centauri b',
             'sun',
             'venus'
+        ])
+
+    @pytest.mark.skipif(django.VERSION < (5, 2), reason="Requires Django 5.2+")
+    def test_queryset_values_list_order1(self):
+        cte = CTE(
+            Order.objects.values("region")
+            .annotate(c=Count("region"))
+            .values_list("c", "region")
+            .order_by("region")
+        )
+        qs = with_cte(cte, select=cte)
+        # Use the `ValuesListIterable` for being able to inspect the order of the fields
+        # in the resulting query
+        qs._iterable_class = ValuesListIterable
+        # Ensure the column order of queried fields is the specified one: c, region
+        # Before the fix, the order would have been this one: region, c
+        self.assertEqual(list(qs), [
+            (4, 'earth'),
+            (3, 'mars'),
+            (3, 'mercury'),
+            (3, 'moon'),
+            (1, 'proxima centauri'),
+            (3, 'proxima centauri b'),
+            (1, 'sun'),
+            (4, 'venus'),
+        ])
+
+    @pytest.mark.skipif(django.VERSION < (5, 2), reason="Requires Django 5.2+")
+    def test_queryset_values_list_order2(self):
+        cte = CTE(
+            Order.objects.values("region")
+            .annotate(r=F("region"), c=Count("region"))
+            .values_list("c", "r")
+            .order_by("r")
+        )
+        qs = with_cte(cte, select=cte)
+        # Use the `ValuesListIterable` for being able to inspect the order of the fields
+        # in the resulting query
+        qs._iterable_class = ValuesListIterable
+        # Ensure the column order of queried fields is the specified one: c, r
+        # Before the fix, the order would have been this one: r, c
+        self.assertEqual(list(qs), [
+            (4, 'earth'),
+            (3, 'mars'),
+            (3, 'mercury'),
+            (3, 'moon'),
+            (1, 'proxima centauri'),
+            (3, 'proxima centauri b'),
+            (1, 'sun'),
+            (4, 'venus'),
         ])
