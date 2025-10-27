@@ -1,4 +1,5 @@
 import pytest
+import django
 from django.db.models import IntegerField, TextField
 from django.db.models.aggregates import Count, Max, Min, Sum
 from django.db.models.expressions import (
@@ -710,4 +711,130 @@ class TestCTE(TestCase):
             ('venus', 21, "admin"),
             ('venus', 22, "admin"),
             ('venus', 23, "admin"),
+        ])
+
+    def test_django52_queryset_aggregates_klass_error(self):
+        cte = CTE(
+            Order.objects.annotate(user_name=F("user__name"))
+            .values("user_name")
+            .annotate(c=Count("user_name"))
+            .values("user_name", "c")
+        )
+        qs = with_cte(cte, select=cte)
+        # Executing the query should not raise TypeError: 'NoneType' object is not subscriptable
+        self.assertEqual(list(qs), [{"user_name": "admin", "c": 22}])
+
+    def test_django52_annotate_model_field_name_after_queryset(self):
+        # Select the `id` field in one CTE
+        cte = CTE(Order.objects.values("id", "region", "user_id"))
+        # In the next query, when querying from the CTE we reassign the `id` field
+        # Previously, this would have thrown an exception
+        qs = (
+            with_cte(cte, select=cte)
+            .annotate(id=F('user_id'))
+            .values_list('id', 'region')
+            .order_by('id', 'region')
+            .distinct()
+        )
+        self.assertEqual(list(qs), [
+            (1, 'earth'),
+            (1, 'mars'),
+            (1, 'mercury'),
+            (1, 'moon'),
+            (1, 'proxima centauri'),
+            (1, 'proxima centauri b'),
+            (1, 'sun'),
+            (1, 'venus'),
+        ])
+
+    @pytest.mark.skipif(django.VERSION < (5, 2), reason="Requires Django 5.2+")
+    def test_queryset_after_values_list(self):
+        cte = CTE(Order.objects.values_list("region", "amount").order_by("region", "amount"))
+        qs = with_cte(cte, select=cte)
+        self.assertEqual(list(qs), [
+            ('earth', 30),
+            ('earth', 31),
+            ('earth', 32),
+            ('earth', 33),
+            ('mars', 40),
+            ('mars', 41),
+            ('mars', 42),
+            ('mercury', 10),
+            ('mercury', 11),
+            ('mercury', 12),
+            ('moon', 1),
+            ('moon', 2),
+            ('moon', 3),
+            ('proxima centauri', 2000),
+            ('proxima centauri b', 10),
+            ('proxima centauri b', 11),
+            ('proxima centauri b', 12),
+            ('sun', 1000),
+            ('venus', 20),
+            ('venus', 21),
+            ('venus', 22),
+            ('venus', 23),
+        ])
+
+    @pytest.mark.skipif(django.VERSION < (5, 2), reason="Requires Django 5.2+")
+    def test_queryset_after_values_list_flat(self):
+        cte = CTE(
+            Order.objects.values_list("region", flat=True)
+            .order_by("region")
+            .distinct()
+        )
+        qs = with_cte(cte, select=cte)
+        self.assertEqual(list(qs), [
+            'earth',
+            'mars',
+            'mercury',
+            'moon',
+            'proxima centauri',
+            'proxima centauri b',
+            'sun',
+            'venus'
+        ])
+
+    @pytest.mark.skipif(django.VERSION < (5, 2), reason="Requires Django 5.2+")
+    def test_queryset_values_list_order1(self):
+        cte = CTE(
+            Order.objects.values("region")
+            .annotate(c=Count("region"))
+            .values_list("c", "region")
+            .order_by("region")
+        )
+        qs = with_cte(cte, select=cte)
+        # Ensure the column order of queried fields is the specified one: c, region
+        # Before the fix, the order would have been this one: region, c
+        self.assertEqual(list(qs), [
+            (4, 'earth'),
+            (3, 'mars'),
+            (3, 'mercury'),
+            (3, 'moon'),
+            (1, 'proxima centauri'),
+            (3, 'proxima centauri b'),
+            (1, 'sun'),
+            (4, 'venus'),
+        ])
+
+    @pytest.mark.skipif(django.VERSION < (5, 2), reason="Requires Django 5.2+")
+    def test_queryset_values_list_order2(self):
+        cte = CTE(
+            Order.objects.values("region")
+            .annotate(r=F("region"), c=Count("region"))
+            .values_list("c", "r")
+            .order_by("r")
+        )
+        qs = with_cte(cte, select=cte)
+        # Ensure the column order of queried fields is the specified one: c, r
+        # Before the fix, the order would have been this one: r, c
+        self.assertEqual(list(qs), [
+            (4, 'earth'),
+            (3, 'mars'),
+            (3, 'mercury'),
+            (3, 'moon'),
+            (1, 'proxima centauri'),
+            (3, 'proxima centauri b'),
+            (1, 'sun'),
+            (4, 'venus'),
         ])
