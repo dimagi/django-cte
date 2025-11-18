@@ -838,3 +838,39 @@ class TestCTE(TestCase):
             (1, 'sun'),
             (4, 'venus'),
         ])
+
+    @pytest.mark.skipif(django.VERSION < (5, 2), reason="Requires Django 5.2+")
+    def test_left_outer_join_invalid_innerjoin(self):
+        totals = CTE(
+            Order.objects
+            .values("region_id")
+            .annotate(total=Sum("amount"))
+        )
+        # Query all regions but only show the total order amount for regions that are
+        # grandchildren of "sun".
+        # This requires the __parent to be joined using LEFT OUTER JOIN too.
+        # Otherwise, if django did an INNER JOIN for __parent then only regions that
+        # have a parent would be included in the result set.
+        qs = with_cte(
+            totals,
+            select=totals.join(
+                Region,
+                parent__parent="sun",
+                name=totals.col.region_id,
+                _join_type=LOUTER
+            ).values("name", total=totals.col.total)
+            .order_by("name")
+        )
+        self.assertEqual(list(qs), [
+            {'name': "bernard's star", 'total': None},
+            {'name': 'deimos', 'total': None},
+            {'name': 'earth', 'total': None},
+            {'name': 'mars', 'total': None},
+            {'name': 'mercury', 'total': None},
+            {'name': 'moon', 'total': 6},
+            {'name': 'phobos', 'total': None},
+            {'name': 'proxima centauri', 'total': None},
+            {'name': 'proxima centauri b', 'total': None},
+            {'name': 'sun', 'total': None},
+            {'name': 'venus', 'total': None}
+        ])
