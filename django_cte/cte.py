@@ -115,7 +115,12 @@ class CTE:
         q_object = Q(*filter_q, **filter_kw)
         map = query.alias_map
         existing_inner = set(a for a in map if map[a].join_type == INNER)
-        on_clause, _ = query._add_q(q_object, query.used_aliases)
+        if django.VERSION >= (5, 2):
+            on_clause, _ = query._add_q(
+                q_object, query.used_aliases, update_join_types=(join_type == INNER)
+            )
+        else:
+            on_clause, _ = query._add_q(q_object, query.used_aliases)
         query.demote_joins(existing_inner)
 
         parent = query.get_initial_alias()
