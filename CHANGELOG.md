@@ -1,6 +1,6 @@
 # Django CTE change log
 
-## 3.0.0 - unreleased
+## 3.0.0 - 2026-02-05
 
 - **BREAKING:** on Django 5.2 and later when joining a CTE to a queryset with
   LEFT OUTER JOIN (`_join_type=LOUTER`) and the join condition implicitly joins
@@ -8,7 +8,11 @@
   INNER JOIN. This makes the join behavior match SQL database semantics: the
   left-side rows are always preserved. To restore the old behavior, either
   do not use `_join_type=LOUTER` or add extra WHERE conditions as needed.
-  See https://github.com/dimagi/django-cte/pull/130 for more details.
+  See [#130](https://github.com/dimagi/django-cte/pull/130) for more details.
+- Fixed `CTE.queryset()` queries involving aggregates ([#128](https://github.com/dimagi/django-cte/issues/128)).
+- Fixed Django 5.2 ambiguous column names bug ([#127](https://github.com/dimagi/django-cte/issues/127)).
+- Fixed possible ambiguous column names in SQL ([#125](https://github.com/dimagi/django-cte/issues/125)).
+- Fixed Django 5.2 `CTE.queryset()` regression ([#124](https://github.com/dimagi/django-cte/pull/124)).
 
 ## 2.0.0 - 2025-06-16
 
