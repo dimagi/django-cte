@@ -1,22 +1,14 @@
 # Django CTE change log
 
-## Unreleased
+## 3.0.0 - unreleased
 
-- **BREAKING:** On Django 5.2 and later, the behavior when joining a CTE to a
-  queryset using a LEFT OUTER JOIN (`_join_type=LOUTER`) and a join condition
-  that requires implicit joining of a related table changes slightly to better
-  align with the behavior of LEFT OUTER JOINs as defined and executed by dbs,
-  such that the LEFT OUTER JOIN always includes all rows from the left side in
-  the join result set.
-
-  The previous behavior before applying this fix was that the third relation
-  table was implicitly joined using an INNER JOIN instead of a LEFT OUTER JOIN,
-  which incorrectly reduced the result set to rows for which an entry in the
-  third relation table actually existed. To achieve this previous behavior from
-  now on an additional filter that excludes rows for which the value from the
-  third relation table used in the join condition is null must be added to the
-  post-CTE join queryset. This will also implicitly get Django back to doing an
-  INNER JOIN when joining the third relation table.
+- **BREAKING:** on Django 5.2 and later when joining a CTE to a queryset with
+  LEFT OUTER JOIN (`_join_type=LOUTER`) and the join condition implicitly joins
+  a related table, the implicit join is now a LEFT OUTER JOIN instead of an
+  INNER JOIN. This makes the join behavior match SQL database semantics: the
+  left-side rows are always preserved. To restore the old behavior, either
+  do not use `_join_type=LOUTER` or add extra WHERE conditions as needed.
+  See https://github.com/dimagi/django-cte/pull/130 for more details.
 
 ## 2.0.0 - 2025-06-16
 
