@@ -1,5 +1,15 @@
 # Django CTE change log
 
+## 3.0.0 - unreleased
+
+- **BREAKING:** on Django 5.2 and later when joining a CTE to a queryset with
+  LEFT OUTER JOIN (`_join_type=LOUTER`) and the join condition implicitly joins
+  a related table, the implicit join is now a LEFT OUTER JOIN instead of an
+  INNER JOIN. This makes the join behavior match SQL database semantics: the
+  left-side rows are always preserved. To restore the old behavior, either
+  do not use `_join_type=LOUTER` or add extra WHERE conditions as needed.
+  See https://github.com/dimagi/django-cte/pull/130 for more details.
+
 ## 2.0.0 - 2025-06-16
 
 - **API overhaul**
