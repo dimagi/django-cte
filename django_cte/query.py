@@ -130,9 +130,60 @@ def generate_cte_sql(connection, query, as_sql):
 
 
 def get_cte_query_template(cte):
+    template = "{name} AS"
     if cte.materialized:
-        return "{name} AS MATERIALIZED ({query})"
-    return "{name} AS ({query})"
+        template += " MATERIALIZED"
+    template += " ({query})"
+
+    if cte.cycle:
+        cycle_clause = _format_cycle_clause(cte.cycle)
+        if cycle_clause:
+            template += " " + cycle_clause
+
+    return template
+
+
+def _format_cycle_clause(cycle):
+    """Format the CYCLE clause for recursive CTEs
+
+    :param cycle: Can be:
+        - A list/tuple of column names to track for cycles
+        - A dict with 'columns', 'set', 'to', 'default', and 'using' keys
+    :returns: The formatted CYCLE clause string, or empty string if invalid
+    """
+    if not cycle:
+        return ""
+
+    if isinstance(cycle, (list, tuple)):
+        columns = cycle
+        cycle_mark = "is_cycle"
+        cycle_value = "true"
+        default_value = "false"
+        path_column = "path"
+    elif isinstance(cycle, dict):
+        columns = cycle.get("columns", [])
+        cycle_mark = cycle.get("set", "is_cycle")
+        cycle_value = cycle.get("to", "true")
+        default_value = cycle.get("default", "false")
+        path_column = cycle.get("using", "path")
+    else:
+        return ""
+
+    if not columns:
+        return ""
+
+    if isinstance(columns, (list, tuple)):
+        columns_str = ", ".join(str(col) for col in columns)
+    else:
+        columns_str = str(columns)
+
+    cycle_clause = (
+        f"CYCLE {columns_str} "
+        f"SET {cycle_mark} TO {cycle_value} DEFAULT {default_value} "
+        f"USING {path_column}"
+    )
+
+    return cycle_clause
 
 
 def _ignore_with_col_aliases(cte_query):
