@@ -35,4 +35,8 @@ def raw_cte_sql(sql, params, refs):
             def resolve_ref(name):
                 return raw_cte_ref(refs[name])
 
+            @classmethod
+            def resolve_expression(cls, *args, **kwargs):
+                return cls
+
     return raw_cte_queryset
