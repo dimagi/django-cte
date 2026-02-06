@@ -52,3 +52,16 @@ class TestRawCTE(TestCase):
             str(moon_avg.query).startswith(
                 'WITH RECURSIVE "mixedCaseCTEName"')
         )
+
+    def test_raw_cte_subquery(self):
+        cte = CTE(raw_cte_sql(
+            "SELECT name as region_name FROM region WHERE name = %s",
+            ["earth"],
+            {"region_name": text_field}
+        ))
+        cte_qs = with_cte(
+            cte, 
+            select=cte.join(Region, name=cte.col.region_name)
+        )
+        regions = Region.objects.filter(name__in=cte_qs)
+        self.assertEqual(list(regions.values_list('name', flat=True)), ['earth'])
