@@ -1,7 +1,7 @@
 from copy import copy
 
 import django
-from django.db.models import Manager, sql
+from django.db.models import Manager, sql, TextField, BooleanField
 from django.db.models.expressions import Ref
 from django.db.models.query import Q, QuerySet, ValuesIterable
 from django.db.models.sql.datastructures import BaseTable
@@ -43,24 +43,35 @@ class CTE:
     eventually be added.
     :param materialized: Optional parameter (default: False) which enforce
     using of MATERIALIZED statement for supporting databases.
+    :param cycle: Optional parameter (default: None) to enable cycle detection
+    for recursive CTEs. Can be:
+    - A list/tuple of column names to track for cycles
+    - A dict with 'columns', 'set' (cycle mark column), 'to' (cycle value),
+      'default' (non-cycle value), 'using' (path column), and 'using_output_field'
+      (output field type for the path column, defaults to TextField) keys
     """
 
-    def __init__(self, queryset, name="cte", materialized=False):
+    def __init__(self, queryset, name="cte", materialized=False, cycle=None):
         self._set_queryset(queryset)
         self.name = name
         self.col = CTEColumns(self)
         self.materialized = materialized
+        self.cycle = cycle
 
     def __getstate__(self):
-        return (self.query, self.name, self.materialized, self._iterable_class)
+        return (self.query, self.name, self.materialized, self._iterable_class, self.cycle)
 
     def __setstate__(self, state):
         if len(state) == 3:
             # Keep compatibility with the previous serialization method
             self.query, self.name, self.materialized = state
             self._iterable_class = ValuesIterable
-        else:
+            self.cycle = None
+        elif len(state) == 4:
             self.query, self.name, self.materialized, self._iterable_class = state
+            self.cycle = None
+        else:
+            self.query, self.name, self.materialized, self._iterable_class, self.cycle = state
         self.col = CTEColumns(self)
 
     def __repr__(self):
@@ -71,7 +82,7 @@ class CTE:
         self._iterable_class = getattr(queryset, "_iterable_class", ValuesIterable)
 
     @classmethod
-    def recursive(cls, make_cte_queryset, name="cte", materialized=False):
+    def recursive(cls, make_cte_queryset, name="cte", materialized=False, cycle=None):
         """Recursive Common Table Expression
 
         :param make_cte_queryset: Function taking a single argument (a
@@ -80,9 +91,10 @@ class CTE:
         statement unioned with a recursive statement.
         :param name: See `name` parameter of `__init__`.
         :param materialized: See `materialized` parameter of `__init__`.
+        :param cycle: See `cycle` parameter of `__init__`.
         :returns: The fully constructed recursive cte object.
         """
-        cte = cls(None, name, materialized)
+        cte = cls(None, name, materialized, cycle)
         cte._set_queryset(make_cte_queryset(cte))
         return cte
 
@@ -125,6 +137,29 @@ class CTE:
 
         parent = query.get_initial_alias()
         query.join(QJoin(parent, self.name, self.name, on_clause, join_type))
+        
+        # add annotations for CYCLE clause generated columns
+        if self.cycle:
+            cycle_config = self.cycle if isinstance(self.cycle, dict) else {}
+            set_col = cycle_config.get('set', 'is_cycle')
+            using_col = cycle_config.get('using', 'path')
+            # default to TextField and defer to user for specifying correct output_field.
+            # using ArrayField with psycopg2 requires tinkering with list adaption since the USING column
+            # is of type ARRAY[RECORD] and RECORD is a pseudo-type for unspecified row types,
+            # psycopg2 does not convert it to a list automatically as it considers RECORD an unknown type.
+            #
+            # See:
+            # * https://www.psycopg.org/docs/usage.html#lists-adaptation
+            # * https://www.psycopg.org/docs/extensions.html#cast-array-unknown
+            # * https://www.postgresql.org/docs/current/datatype-pseudo.html#DATATYPE-PSEUDO
+            using_output_field = cycle_config.get('using_output_field', TextField())
+            if set_col not in query.annotations:
+                col = CTEColumnRef(set_col, self.name, BooleanField())
+                query.add_annotation(col, set_col)
+            if using_col not in query.annotations:
+                col = CTEColumnRef(using_col, self.name, using_output_field)
+                query.add_annotation(col, using_col)
+
         return queryset
 
     def queryset(self):
@@ -163,6 +198,20 @@ class CTE:
                     col = CTEColumnRef(alias, self.name, output_field)
                     query.add_annotation(col, alias)
             query.selected = {alias: alias for alias in selected}
+
+        # add annotations for CYCLE clause generated columns
+        if self.cycle:
+            cycle_config = self.cycle if isinstance(self.cycle, dict) else {}
+            set_col = cycle_config.get('set', 'is_cycle')
+            using_col = cycle_config.get('using', 'path')
+            # see comment in join() method about using_output_field
+            using_output_field = cycle_config.get('using_output_field', TextField())
+            if set_col not in query.annotations:
+                col = CTEColumnRef(set_col, self.name, BooleanField())
+                query.add_annotation(col, set_col)
+            if using_col not in query.annotations:
+                col = CTEColumnRef(using_col, self.name, using_output_field)
+                query.add_annotation(col, using_col)
 
         qs.query = query
         return qs
