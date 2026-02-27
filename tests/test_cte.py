@@ -1,5 +1,6 @@
 import pytest
 import django
+from django.db import connections
 from django.db.models import IntegerField, TextField
 from django.db.models.aggregates import Count, Max, Min, Sum
 from django.db.models.expressions import (
@@ -8,6 +9,7 @@ from django.db.models.expressions import (
 from django.db.models.sql.constants import LOUTER
 from django.db.utils import OperationalError, ProgrammingError
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 
 from django_cte import CTE, with_cte
 
@@ -874,3 +876,23 @@ class TestCTE(TestCase):
             {'name': 'sun', 'total': None},
             {'name': 'venus', 'total': None}
         ])
+
+    def test_select_for_update_with_select_related(self):
+        # Test that we lock the order, and only the order, whilst joining to the user table so we
+        # only perform a single query even when accessing the related user with `order.user`.
+        cte = CTE(Order.objects.select_for_update(no_key=True).filter(id=1), name='c')
+        qs = with_cte(cte, select=cte).select_related('user')
+
+        with CaptureQueriesContext(connections['default']) as queries:
+            order = qs.get()
+            _ = order.user
+
+        [query] = queries.captured_queries
+        assert query['sql'] == (
+            # Obtain the lock on the results of the CTE, which should only fetch the 'order'.
+            'WITH RECURSIVE "c" AS (SELECT "orders"."id", "orders"."region_id", "orders"."amount", "orders"."user_id" FROM "orders" WHERE "orders"."id" = 1 FOR NO KEY UPDATE) '
+            # Select the 'order' from the CTE and join to the 'user' table.
+            'SELECT "c"."id", "c"."region_id", "c"."amount", "c"."user_id", "user"."id", "user"."name" FROM "c" '
+            'LEFT OUTER JOIN "user" ON ("c"."user_id" = "user"."id") '
+            'LIMIT 21'
+        )
