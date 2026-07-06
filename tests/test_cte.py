@@ -5,13 +5,14 @@ from django.db.models.aggregates import Count, Max, Min, Sum
 from django.db.models.expressions import (
     Exists, ExpressionWrapper, F, OuterRef, Subquery,
 )
+from django.db.models.deletion import Collector
 from django.db.models.sql.constants import LOUTER
 from django.db.utils import OperationalError, ProgrammingError
 from django.test import TestCase
 
 from django_cte import CTE, with_cte
 
-from .models import Order, Region, User
+from .models import Order, Region, User, WithDBColumn
 
 int_field = IntegerField()
 text_field = TextField()
@@ -359,6 +360,11 @@ class TestCTE(TestCase):
         strict=True,
     )
     def test_delete_cte_query(self):
+        # This test requires "fast" deletion. If this constraint is broken
+        # the models have been modified in an incompatible way and they
+        # should be adjusted until this assertion passes again.
+        self.assertTrue(Collector(None).can_fast_delete(Order))
+
         cte = CTE(
             Order.objects
             .values(region_parent=F("region__parent_id"))
@@ -873,4 +879,41 @@ class TestCTE(TestCase):
             {'name': 'proxima centauri b', 'total': None},
             {'name': 'sun', 'total': None},
             {'name': 'venus', 'total': None}
+        ])
+
+    def test_fields_with_db_column(self):
+        cte = CTE.recursive(
+            lambda cte: WithDBColumn.objects.filter(id=10)
+                .union(cte.join(WithDBColumn, id=cte.col.parent_id))
+        )
+        qs = with_cte(cte, select=cte)
+        query = str(qs.query)
+        self.assertIn("uid", query)
+        self.assertIn("pid", query)
+        self.assertEqual(
+            [(i.id, i.parent_id) for i in qs],
+            [(i, (i - 1) if i > 1 else None) for i in range(10, 0, -1)]
+        )
+
+    @pytest.mark.skipif(django.VERSION < (5, 2), reason='Requires Django 5.2+')
+    def test_composite_primary_key(self):
+        from .models import Site, WithCompositePK
+
+        cte = CTE(WithCompositePK.objects.all())
+        qs = with_cte(cte, select=cte).values(test=cte.col.pk)
+
+        with pytest.raises(ValueError, match='reference column pairs'):
+            str(qs.query)
+
+        qs = with_cte(cte, select=cte).values(test1=cte.col.site, test2=cte.col.username)
+        query = str(qs.query)
+        self.assertIn("test1", query)
+        self.assertIn("site_id", query)
+        self.assertIn("test2", query)
+        self.assertIn("username", query)
+        self.assertEqual(list(qs), [
+            {
+                'test1': Site.objects.values_list("pk", flat=True).get(),
+                'test2': "test_user",
+            }
         ])

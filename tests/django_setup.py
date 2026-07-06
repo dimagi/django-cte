@@ -1,6 +1,8 @@
+import django
+
 from django.db import connection
 
-from .models import KeyPair, Region, Order, User
+from .models import KeyPair, Region, Order, User, WithDBColumn
 
 is_initialized = False
 
@@ -76,3 +78,14 @@ def setup_data():
     ]:
         parent = parent and KeyPair.objects.filter(key=parent).first()
         KeyPair.objects.create(key=key, value=value, parent=parent)
+
+    parent = None
+    for i in range(10):
+        parent = WithDBColumn.objects.create(parent=parent)
+
+    if django.VERSION >= (5, 2):
+        from .models import Site, WithCompositePK
+
+        site = Site.objects.create(name="test_site")
+
+        WithCompositePK.objects.create(site=site, username="test_user")

@@ -27,6 +27,8 @@ def raw_cte_sql(sql, params, refs):
 
     class raw_cte_queryset:
         class query:
+            annotations = {}
+
             @staticmethod
             def get_compiler(connection, *, elide_empty=None):
                 return raw_cte_compiler(connection)
