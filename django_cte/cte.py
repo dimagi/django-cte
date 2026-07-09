@@ -167,11 +167,20 @@ class CTE:
         qs.query = query
         return qs
 
-    def _resolve_ref(self, name):
+    def _resolve_ref(self, column):
+        name = column.name
+        ref = self.query.resolve_ref(name)
+        if ref is column or column in ref.get_source_expressions():
+            raise ValueError(f"Circular reference: {column} = {ref}")
+
+        if name in self.query.annotations:
+            return CTEColumnRef(name, self.name, ref.output_field)
+
         selected = getattr(self.query, "selected", None)
         if selected and name in selected and name not in self.query.annotations:
-            return Ref(name, self.query.resolve_ref(name))
-        return self.query.resolve_ref(name)
+            return Ref(name, ref)
+
+        return ref
 
     def resolve_expression(self, *args, **kw):
         if self.query is None:

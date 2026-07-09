@@ -2,6 +2,12 @@ import weakref
 
 from django.db.models.expressions import Col, Expression
 
+try:
+    from django.db.models.expressions import ColPairs as _ColPairs
+except ImportError:
+    class _ColPairs:
+        pass
+
 
 class CTEColumns:
 
@@ -35,9 +41,11 @@ class CTEColumn(Expression):
                 "Hint: use ExpressionWrapper({cte}.col.{name}, "
                 "output_field=...)".format(cte=self._cte.name, name=self.name)
             )
-        ref = self._cte._resolve_ref(self.name)
-        if ref is self or self in ref.get_source_expressions():
-            raise ValueError("Circular reference: {} = {}".format(self, ref))
+
+        ref = self._cte._resolve_ref(self)
+        if isinstance(ref, _ColPairs):
+            raise ValueError("Cannot reference column pairs directly")
+
         return ref
 
     @property
@@ -58,10 +66,7 @@ class CTEColumn(Expression):
     def as_sql(self, compiler, connection):
         qn = compiler.quote_name_unless_alias
         ref = self._ref
-        if isinstance(ref, Col) and self.name == "pk":
-            column = ref.target.column
-        else:
-            column = self.name
+        column = ref.target.column if isinstance(ref, Col) else self.name
         return "%s.%s" % (qn(self.table_alias), qn(column)), []
 
     def relabeled_clone(self, relabels):

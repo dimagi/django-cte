@@ -1,12 +1,15 @@
+import django
+
 from django.db.models import (
-    CASCADE,
-    Manager,
-    Model,
-    QuerySet,
     AutoField,
+    CASCADE,
     CharField,
     ForeignKey,
     IntegerField,
+    Manager,
+    Model,
+    QuerySet,
+    SlugField,
     TextField,
 )
 
@@ -68,3 +71,22 @@ class KeyPair(Model):
 
     class Meta:
         db_table = "keypair"
+
+
+class WithDBColumn(Model):
+    id = AutoField(db_column="uid", primary_key=True)
+    parent = ForeignKey("self", db_column="pid", null=True, on_delete=CASCADE)
+
+
+if django.VERSION >= (5, 2):
+    from django.db.models import CompositePrimaryKey
+
+
+    class Site(Model):
+        name = SlugField()
+
+
+    class WithCompositePK(Model):
+        pk = CompositePrimaryKey("site_id", "username")
+        site = ForeignKey(Site, on_delete=CASCADE)
+        username = CharField(max_length=32)
