@@ -41,11 +41,11 @@ class CTE:
     entities (tables, views, functions, other CTE(s), etc.) referenced
     in the given query as well any query to which this CTE will
     eventually be added.
-    :param materialized: Optional parameter (default: False) which enforce
-    using of MATERIALIZED statement for supporting databases.
+    :param materialized: Optional parameter (default: None) which generates
+    the MATERIALIZED / NOT MATERIALIZED statement for supporting databases.
     """
 
-    def __init__(self, queryset, name="cte", materialized=False):
+    def __init__(self, queryset, name="cte", materialized=None):
         self._set_queryset(queryset)
         self.name = name
         self.col = CTEColumns(self)
@@ -55,12 +55,7 @@ class CTE:
         return (self.query, self.name, self.materialized, self._iterable_class)
 
     def __setstate__(self, state):
-        if len(state) == 3:
-            # Keep compatibility with the previous serialization method
-            self.query, self.name, self.materialized = state
-            self._iterable_class = ValuesIterable
-        else:
-            self.query, self.name, self.materialized, self._iterable_class = state
+        self.query, self.name, self.materialized, self._iterable_class = state
         self.col = CTEColumns(self)
 
     def __repr__(self):
@@ -71,7 +66,7 @@ class CTE:
         self._iterable_class = getattr(queryset, "_iterable_class", ValuesIterable)
 
     @classmethod
-    def recursive(cls, make_cte_queryset, name="cte", materialized=False):
+    def recursive(cls, make_cte_queryset, name="cte", materialized=None):
         """Recursive Common Table Expression
 
         :param make_cte_queryset: Function taking a single argument (a
@@ -82,7 +77,7 @@ class CTE:
         :param materialized: See `materialized` parameter of `__init__`.
         :returns: The fully constructed recursive cte object.
         """
-        cte = cls(None, name, materialized)
+        cte = cls(None, name=name, materialized=materialized)
         cte._set_queryset(make_cte_queryset(cte))
         return cte
 

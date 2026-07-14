@@ -1,5 +1,11 @@
 # Django CTE change log
 
+## Unreleased
+
+- Passing `materialized=False` when constructing a `CTE` will now generate a
+  common table expression with `NOT MATERIALIZED`. Use `None` or do not specify
+  a value in order to omit the `MATERIALIZED` specification.
+
 ## 4.0.0 - 2026-08-28
 
 - **BREAKING** Dropped support for Python 3.9 (EOL 2025-10-31).
