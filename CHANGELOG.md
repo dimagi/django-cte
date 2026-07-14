@@ -1,5 +1,11 @@
 # Django CTE change log
 
+## Unreleased
+
+- Passing `materialized=False` when constructing a `CTE` will now generate a
+  common table expression with `NOT MATERIALIZED`. Use `None` or do not specify
+  a value in order to omit the `MATERIALIZED` specification.
+
 ## 3.0.0 - 2026-02-05
 
 - **BREAKING:** on Django 5.2 and later when joining a CTE to a queryset with
