@@ -131,8 +131,13 @@ def generate_cte_sql(connection, query, as_sql):
 
 def get_cte_query_template(cte):
     if cte.materialized:
-        return "{name} AS MATERIALIZED ({query})"
-    return "{name} AS ({query})"
+        materialized = "MATERIALIZED "
+    elif cte.materialized is False:
+        materialized = "NOT MATERIALIZED "
+    else:
+        materialized = ""
+
+    return f"{{name}} AS {materialized}({{query}})"
 
 
 def _ignore_with_col_aliases(cte_query):
