@@ -1,6 +1,7 @@
 import pickle
 from unittest import SkipTest
 
+from django.db import connection
 from django.db.models import IntegerField, TextField
 from django.db.models.expressions import (
     Case,
@@ -332,3 +333,275 @@ class TestRecursiveCTE(TestCase):
             {'pk': 'earth'},
             {'pk': 'moon'},
         ])
+
+    def test_cycle_with_list_of_columns(self):
+        if connection.vendor == "sqlite":
+            raise SkipTest("SQLite does not support CYCLE clause")
+
+        cycle_a = Region.objects.create(name="cycle_a", parent=None)
+        cycle_b = Region.objects.create(name="cycle_b", parent=cycle_a)
+        cycle_c = Region.objects.create(name="cycle_c", parent=cycle_b)
+        cycle_a.parent = cycle_c
+        cycle_a.save()
+
+        def make_regions_cte(cte):
+            return Region.objects.filter(
+                name="cycle_a"
+            ).values(
+                "name",
+            ).union(
+                cte.join(Region, parent=cte.col.name).values(
+                    "name",
+                ),
+                all=True,
+            )
+
+        cte = CTE.recursive(
+            make_regions_cte, cycle={"columns": ["name"], "using": "cycle_path"}
+        )
+
+        regions = with_cte(
+            cte,
+            select=cte.join(Region, name=cte.col.name)
+            .order_by("name")
+        )
+        query_str = str(regions.query)
+        print(query_str)
+
+        self.assertIn("CYCLE name", query_str)
+        self.assertIn("SET is_cycle", query_str)
+        self.assertIn("TO true DEFAULT false", query_str)
+        self.assertIn("USING cycle_path", query_str)
+
+        data = list(regions.values_list("name", "is_cycle"))
+        self.assertEqual(data, [
+            ('cycle_a', False),
+            ('cycle_a', True),
+            ('cycle_b', False),
+            ('cycle_c', False),
+        ])
+
+        cycle_a.delete()
+        cycle_b.delete()
+        cycle_c.delete()
+
+    def test_cycle_with_dict_config(self):
+        if connection.vendor == "sqlite":
+            raise SkipTest("SQLite does not support CYCLE clause")
+
+        alpha = Region.objects.create(name="alpha", parent=None)
+        beta = Region.objects.create(name="beta", parent=alpha)
+        gamma = Region.objects.create(name="gamma", parent=beta)
+        delta = Region.objects.create(name="delta", parent=gamma)
+        alpha.parent = delta
+        alpha.save()
+
+        def make_regions_cte(cte):
+            return Region.objects.filter(name="alpha").values("name").union(
+                cte.join(Region, parent=cte.col.name).values("name"),
+                all=True,
+            )
+
+        cycle_config = {
+            "columns": ["name"],
+            "set": "cycle_detected",
+            "to": "1",
+            "default": "0",
+            "using": "cycle_path",
+        }
+        cte = CTE.recursive(make_regions_cte, cycle=cycle_config)
+
+        regions = with_cte(
+            cte,
+            select=cte.join(Region, name=cte.col.name)
+            .order_by("name")
+        )
+        query_str = str(regions.query)
+        print(query_str)
+
+        self.assertIn("CYCLE name", query_str)
+        self.assertIn("SET cycle_detected", query_str)
+        self.assertIn("TO 1 DEFAULT 0", query_str)
+        self.assertIn("USING cycle_path", query_str)
+
+        data = list(regions.values_list("name", "cycle_detected", "cycle_path"))
+        self.assertEqual(len(data), 5)
+        
+        # Build a dict for easier lookup: (name, cycle_detected) -> cycle_path
+        path_lookup = {}
+        for name, cycle_detected, cycle_path in data:
+            path_lookup[(name, cycle_detected)] = cycle_path
+        
+        # First alpha (starting point): path contains only alpha
+        self.assertIn("alpha", path_lookup[("alpha", 0)])
+        self.assertNotIn("beta", path_lookup[("alpha", 0)])
+        
+        # Second alpha (cycle detected): path contains the full cycle
+        self.assertIn("alpha", path_lookup[("alpha", 1)])
+        self.assertIn("beta", path_lookup[("alpha", 1)])
+        self.assertIn("gamma", path_lookup[("alpha", 1)])
+        self.assertIn("delta", path_lookup[("alpha", 1)])
+        
+        # Beta: path contains alpha and beta
+        self.assertIn("alpha", path_lookup[("beta", 0)])
+        self.assertIn("beta", path_lookup[("beta", 0)])
+        self.assertNotIn("gamma", path_lookup[("beta", 0)])
+        
+        # Gamma: path contains alpha, beta, and gamma
+        self.assertIn("alpha", path_lookup[("gamma", 0)])
+        self.assertIn("beta", path_lookup[("gamma", 0)])
+        self.assertIn("gamma", path_lookup[("gamma", 0)])
+        self.assertNotIn("delta", path_lookup[("gamma", 0)])
+        
+        # Delta: path contains alpha, beta, gamma, and delta
+        self.assertIn("alpha", path_lookup[("delta", 0)])
+        self.assertIn("beta", path_lookup[("delta", 0)])
+        self.assertIn("gamma", path_lookup[("delta", 0)])
+        self.assertIn("delta", path_lookup[("delta", 0)])
+
+        alpha.delete()
+        beta.delete()
+        gamma.delete()
+        delta.delete()
+
+    def test_cycle_with_multiple_columns(self):
+        if connection.vendor == "sqlite":
+            raise SkipTest("SQLite does not support CYCLE clause")
+
+        kp1 = KeyPair.objects.create(key="cyc_k1", value=100, parent=None)
+        kp2 = KeyPair.objects.create(key="cyc_k2", value=200, parent=kp1)
+        kp3 = KeyPair.objects.create(key="cyc_k3", value=300, parent=kp2)
+        kp1.parent = kp3
+        kp1.save()
+
+        def make_keypair_cte(cte):
+            return KeyPair.objects.filter(key="cyc_k1", value=100).values("id", "key", "value").union(
+                cte.join(KeyPair, parent_id=cte.col.id).values("id", "key", "value"),
+                all=True,
+            )
+
+        cte = CTE.recursive(
+            make_keypair_cte, cycle={"columns": ["key", "value"], "using": "cycle_path"}
+        )
+
+        pairs = with_cte(
+            cte,
+            select=cte.join(KeyPair, key=cte.col.key, value=cte.col.value)
+            .order_by("key", "value", "is_cycle")
+        )
+        query_str = str(pairs.query)
+        print(query_str)
+
+        self.assertIn("CYCLE key, value", query_str)
+        self.assertIn("SET is_cycle", query_str)
+
+        data = list(pairs.values_list("key", "value", "is_cycle", "cycle_path"))
+        # if testing against psycopg3, cycle_path will be a list of string tuples instead of a string
+        self.assertEqual(data, [
+            ("cyc_k1", 100, False, '{"(cyc_k1,100)"}'),
+            ("cyc_k1", 100, True, '{"(cyc_k1,100)","(cyc_k2,200)","(cyc_k3,300)","(cyc_k1,100)"}'),
+            ("cyc_k2", 200, False, '{"(cyc_k1,100)","(cyc_k2,200)"}'),
+            ("cyc_k3", 300, False, '{"(cyc_k1,100)","(cyc_k2,200)","(cyc_k3,300)"}'),
+        ])
+
+        kp1.delete()
+        kp2.delete()
+        kp3.delete()
+
+    def test_cycle_with_materialized(self):
+        if connection.vendor == "sqlite":
+            raise SkipTest("SQLite does not support CYCLE clause")
+
+        mat_a = Region.objects.create(name="mat_a", parent=None)
+        mat_b = Region.objects.create(name="mat_b", parent=mat_a)
+        mat_c = Region.objects.create(name="mat_c", parent=mat_b)
+        mat_a.parent = mat_c
+        mat_a.save()
+
+        def make_regions_cte(cte):
+            return Region.objects.filter(name="mat_a").values("name").union(
+                cte.join(Region, parent=cte.col.name).values("name"),
+                all=True,
+            )
+
+        cte = CTE.recursive(make_regions_cte, materialized=True, cycle=["name"])
+
+        regions = with_cte(
+            cte,
+            select=cte.join(Region, name=cte.col.name)
+            .order_by("name")
+        )
+        query_str = str(regions.query)
+        print(query_str)
+
+        self.assertIn("AS MATERIALIZED", query_str)
+        self.assertIn("CYCLE name", query_str)
+        self.assertIn("SET is_cycle", query_str)
+
+        data = list(regions.values_list("name", "is_cycle"))
+        self.assertEqual(data, [
+            ("mat_a", False),
+            ("mat_a", True),
+            ("mat_b", False),
+            ("mat_c", False),
+        ])
+
+        mat_a.delete()
+        mat_b.delete()
+        mat_c.delete()
+
+    def test_cycle_hierarchical_traversal(self):
+        if connection.vendor == "sqlite":
+            raise SkipTest("SQLite does not support CYCLE clause")
+
+        node1 = Region.objects.create(name="node1", parent=None)
+        node2 = Region.objects.create(name="node2", parent=node1)
+        node3 = Region.objects.create(name="node3", parent=node2)
+        node4 = Region.objects.create(name="node4", parent=node3)
+        node1.parent = node4
+        node1.save()
+
+        def make_regions_cte(cte):
+            return Region.objects.filter(
+                name="node1"
+            ).values(
+                "name",
+            ).union(
+                cte.join(Region, parent=cte.col.name).values(
+                    "name",
+                ),
+                all=True,
+            )
+
+        cte = CTE.recursive(
+            make_regions_cte, cycle={"columns": ["name"], "using": "cycle_path"}
+        )
+        regions = with_cte(
+            cte,
+            select=cte.join(Region, name=cte.col.name)
+            .order_by("name")
+        )
+        query_str = str(regions.query)
+        print(query_str)
+
+        self.assertIn("CYCLE name", query_str)
+
+        data = list(regions.values_list("name", "is_cycle"))
+        self.assertEqual(data, [
+            ("node1", False),
+            ("node1", True),
+            ("node2", False),
+            ("node3", False),
+            ("node4", False),
+        ])
+
+        non_cycle_rows = list(regions.filter(is_cycle=False).values_list("name", flat=True))
+        self.assertEqual(sorted(non_cycle_rows), ["node1", "node2", "node3", "node4"])
+
+        cycle_rows = list(regions.filter(is_cycle=True).values_list("name", flat=True))
+        self.assertEqual(cycle_rows, ["node1"])
+
+        node1.delete()
+        node2.delete()
+        node3.delete()
+        node4.delete()
