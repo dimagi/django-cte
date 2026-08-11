@@ -30,8 +30,8 @@ def cycle_path(value):
     """Normalize a CYCLE path column value to a list of row tuples
 
     psycopg2 returns the `ARRAY[RECORD]` column as a string, psycopg 3
-    adapts it to a list of tuples. The string form only quotes a record
-    when it contains a comma, so match on the parentheses instead.
+    adapts it to a list of tuples. The string form quotes a record only
+    when its text needs escaping, so match on the parentheses instead.
     """
     if isinstance(value, str):
         rows = re.findall(r"\(([^)]*)\)", value)
