@@ -87,14 +87,15 @@ class CycleConfig:
             self.path_column: self.path_output_field,
         }
 
-    def as_sql(self):
+    def as_sql(self, qn):
         """Get the CYCLE clause SQL
 
+        :param qn: Name quoting function.
         :returns: The CYCLE clause SQL string.
         """
         return (
-            f"CYCLE {', '.join(str(c) for c in self.columns)} "
-            f"SET {self.mark_column} "
+            f"CYCLE {', '.join(qn(c) for c in self.columns)} "
+            f"SET {qn(self.mark_column)} "
             f"TO {self.cycle_value} DEFAULT {self.default_value} "
-            f"USING {self.path_column}"
+            f"USING {qn(self.path_column)}"
         )

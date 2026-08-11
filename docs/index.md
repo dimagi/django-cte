@@ -191,7 +191,7 @@ This generates a `CYCLE` clause with default settings:
 ```sql
 WITH RECURSIVE "cte" AS (
     ...
-) CYCLE name SET is_cycle TO true DEFAULT false USING path
+) CYCLE "name" SET "is_cycle" TO true DEFAULT false USING "path"
 ```
 
 For more control over the cycle detection behavior, you can pass a dictionary:
@@ -202,8 +202,8 @@ cte = CTE.recursive(
     cycle={
         'columns': ['name', 'parent_id'],  # Columns to track
         'set': 'cycle_detected',           # Column name for cycle flag
-        'to': '1',                         # Value when cycle detected
-        'default': '0',                    # Value when no cycle
+        'to': '1',                         # SQL literal when cycle detected
+        'default': '0',                    # SQL literal when no cycle
         'using': 'cycle_path'              # Column name for path tracking
     }
 )
@@ -214,8 +214,12 @@ This generates:
 ```sql
 WITH RECURSIVE "cte" AS (
     ...
-) CYCLE name, parent_id SET cycle_detected TO 1 DEFAULT 0 USING cycle_path
+) CYCLE "name", "parent_id" SET "cycle_detected" TO 1 DEFAULT 0 USING "cycle_path"
 ```
+
+Column names are quoted, but `to` and `default` are SQL literals written into
+the query verbatim, so a string value must carry its own quotes:
+`'to': "'yes'"`. The mark column takes its type from these two literals.
 
 NOTE: Support for the `CYCLE` clause was added in PostgreSQL 14. For earlier versions
 or other databases that don't support it, you'll need to implement cycle

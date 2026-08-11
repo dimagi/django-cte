@@ -380,10 +380,10 @@ class TestRecursiveCTE(TestCase):
         query_str = str(regions.query)
         print(query_str)
 
-        self.assertIn("CYCLE name", query_str)
-        self.assertIn("SET is_cycle", query_str)
+        self.assertIn('CYCLE "name"', query_str)
+        self.assertIn('SET "is_cycle"', query_str)
         self.assertIn("TO true DEFAULT false", query_str)
-        self.assertIn("USING cycle_path", query_str)
+        self.assertIn('USING "cycle_path"', query_str)
 
         data = list(regions.values_list("name", "is_cycle"))
         self.assertEqual(data, [
@@ -396,6 +396,40 @@ class TestRecursiveCTE(TestCase):
         cycle_a.delete()
         cycle_b.delete()
         cycle_c.delete()
+
+    def test_cycle_with_mixed_case_column(self):
+        if connection.vendor == "sqlite":
+            raise SkipTest("SQLite does not support CYCLE clause")
+
+        mc_a = Region.objects.create(name="mc_a", parent=None)
+        mc_b = Region.objects.create(name="mc_b", parent=mc_a)
+        mc_a.parent = mc_b
+        mc_a.save()
+
+        def make_regions_cte(cte):
+            return Region.objects.filter(name="mc_a").values(
+                regionName=F("name"),
+            ).union(
+                cte.join(Region, parent=cte.col.regionName).values(
+                    regionName=F("name"),
+                ),
+                all=True,
+            )
+
+        cte = CTE.recursive(make_regions_cte, cycle=["regionName"])
+
+        regions = with_cte(
+            cte,
+            select=cte.join(Region, name=cte.col.regionName).order_by("name")
+        )
+        self.assertIn('CYCLE "regionName"', str(regions.query))
+
+        data = list(regions.values_list("name", "is_cycle"))
+        self.assertEqual(data, [
+            ("mc_a", False),
+            ("mc_a", True),
+            ("mc_b", False),
+        ])
 
     def test_cycle_with_dict_config(self):
         if connection.vendor == "sqlite":
@@ -431,10 +465,10 @@ class TestRecursiveCTE(TestCase):
         query_str = str(regions.query)
         print(query_str)
 
-        self.assertIn("CYCLE name", query_str)
-        self.assertIn("SET cycle_detected", query_str)
+        self.assertIn('CYCLE "name"', query_str)
+        self.assertIn('SET "cycle_detected"', query_str)
         self.assertIn("TO 1 DEFAULT 0", query_str)
-        self.assertIn("USING cycle_path", query_str)
+        self.assertIn('USING "cycle_path"', query_str)
 
         data = list(regions.values_list("name", "cycle_detected", "cycle_path"))
         self.assertEqual(len(data), 5)
@@ -504,8 +538,8 @@ class TestRecursiveCTE(TestCase):
         query_str = str(pairs.query)
         print(query_str)
 
-        self.assertIn("CYCLE key, value", query_str)
-        self.assertIn("SET is_cycle", query_str)
+        self.assertIn('CYCLE "key", "value"', query_str)
+        self.assertIn('SET "is_cycle"', query_str)
 
         data = list(pairs.values_list("key", "value", "is_cycle", "cycle_path"))
         # if testing against psycopg3, cycle_path will be a list of string tuples instead of a string
@@ -547,8 +581,8 @@ class TestRecursiveCTE(TestCase):
         print(query_str)
 
         self.assertIn("AS MATERIALIZED", query_str)
-        self.assertIn("CYCLE name", query_str)
-        self.assertIn("SET is_cycle", query_str)
+        self.assertIn('CYCLE "name"', query_str)
+        self.assertIn('SET "is_cycle"', query_str)
 
         data = list(regions.values_list("name", "is_cycle"))
         self.assertEqual(data, [
@@ -596,7 +630,7 @@ class TestRecursiveCTE(TestCase):
         query_str = str(regions.query)
         print(query_str)
 
-        self.assertIn("CYCLE name", query_str)
+        self.assertIn('CYCLE "name"', query_str)
 
         data = list(regions.values_list("name", "is_cycle"))
         self.assertEqual(data, [
