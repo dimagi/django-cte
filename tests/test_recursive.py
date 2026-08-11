@@ -1,4 +1,5 @@
 import pickle
+import re
 from unittest import SkipTest
 
 from django.db import connection
@@ -23,6 +24,19 @@ from .models import KeyPair, Region
 
 int_field = IntegerField()
 text_field = TextField()
+
+
+def cycle_path(value):
+    """Normalize a CYCLE path column value to a list of row tuples
+
+    psycopg2 returns the `ARRAY[RECORD]` column as a string, psycopg 3
+    adapts it to a list of tuples. The string form only quotes a record
+    when it contains a comma, so match on the parentheses instead.
+    """
+    if isinstance(value, str):
+        rows = re.findall(r"\(([^)]*)\)", value)
+        return [tuple(row.split(",")) for row in rows]
+    return [tuple(str(item) for item in row) for row in value]
 
 
 class TestRecursiveCTE(TestCase):
@@ -394,10 +408,6 @@ class TestRecursiveCTE(TestCase):
             ('cycle_c', False),
         ])
 
-        cycle_a.delete()
-        cycle_b.delete()
-        cycle_c.delete()
-
     def test_cycle_with_mixed_case_column(self):
         if connection.vendor == "sqlite":
             raise SkipTest("SQLite does not support CYCLE clause")
@@ -477,45 +487,22 @@ class TestRecursiveCTE(TestCase):
         self.assertIn("TO 1 DEFAULT 0", query_str)
         self.assertIn('USING "cycle_path"', query_str)
 
-        data = list(regions.values_list("name", "cycle_detected", "cycle_path"))
-        self.assertEqual(len(data), 5)
-        
-        # Build a dict for easier lookup: (name, cycle_detected) -> cycle_path
-        path_lookup = {}
-        for name, cycle_detected, cycle_path in data:
-            path_lookup[(name, cycle_detected)] = cycle_path
-        
-        # First alpha (starting point): path contains only alpha
-        self.assertIn("alpha", path_lookup[("alpha", 0)])
-        self.assertNotIn("beta", path_lookup[("alpha", 0)])
-        
-        # Second alpha (cycle detected): path contains the full cycle
-        self.assertIn("alpha", path_lookup[("alpha", 1)])
-        self.assertIn("beta", path_lookup[("alpha", 1)])
-        self.assertIn("gamma", path_lookup[("alpha", 1)])
-        self.assertIn("delta", path_lookup[("alpha", 1)])
-        
-        # Beta: path contains alpha and beta
-        self.assertIn("alpha", path_lookup[("beta", 0)])
-        self.assertIn("beta", path_lookup[("beta", 0)])
-        self.assertNotIn("gamma", path_lookup[("beta", 0)])
-        
-        # Gamma: path contains alpha, beta, and gamma
-        self.assertIn("alpha", path_lookup[("gamma", 0)])
-        self.assertIn("beta", path_lookup[("gamma", 0)])
-        self.assertIn("gamma", path_lookup[("gamma", 0)])
-        self.assertNotIn("delta", path_lookup[("gamma", 0)])
-        
-        # Delta: path contains alpha, beta, gamma, and delta
-        self.assertIn("alpha", path_lookup[("delta", 0)])
-        self.assertIn("beta", path_lookup[("delta", 0)])
-        self.assertIn("gamma", path_lookup[("delta", 0)])
-        self.assertIn("delta", path_lookup[("delta", 0)])
-
-        alpha.delete()
-        beta.delete()
-        gamma.delete()
-        delta.delete()
+        data = [
+            (name, detected, cycle_path(path))
+            for name, detected, path in
+            regions.values_list("name", "cycle_detected", "cycle_path")
+        ]
+        # the second alpha row is where the cycle is detected: its path is the
+        # full cycle, and every other path is the walk down to that row
+        self.assertEqual(data, [
+            ("alpha", 0, [("alpha",)]),
+            ("alpha", 1, [
+                ("alpha",), ("beta",), ("gamma",), ("delta",), ("alpha",),
+            ]),
+            ("beta", 0, [("alpha",), ("beta",)]),
+            ("delta", 0, [("alpha",), ("beta",), ("gamma",), ("delta",)]),
+            ("gamma", 0, [("alpha",), ("beta",), ("gamma",)]),
+        ])
 
     def test_cycle_with_multiple_columns(self):
         if connection.vendor == "sqlite":
@@ -549,18 +536,22 @@ class TestRecursiveCTE(TestCase):
         self.assertIn('CYCLE "key", "value"', query_str)
         self.assertIn('SET "is_cycle"', query_str)
 
-        data = list(pairs.values_list("key", "value", "is_cycle", "cycle_path"))
-        # if testing against psycopg3, cycle_path will be a list of string tuples instead of a string
+        data = [
+            (key, value, is_cycle, cycle_path(path))
+            for key, value, is_cycle, path in
+            pairs.values_list("key", "value", "is_cycle", "cycle_path")
+        ]
         self.assertEqual(data, [
-            ("cyc_k1", 100, False, '{"(cyc_k1,100)"}'),
-            ("cyc_k1", 100, True, '{"(cyc_k1,100)","(cyc_k2,200)","(cyc_k3,300)","(cyc_k1,100)"}'),
-            ("cyc_k2", 200, False, '{"(cyc_k1,100)","(cyc_k2,200)"}'),
-            ("cyc_k3", 300, False, '{"(cyc_k1,100)","(cyc_k2,200)","(cyc_k3,300)"}'),
+            ("cyc_k1", 100, False, [("cyc_k1", "100")]),
+            ("cyc_k1", 100, True, [
+                ("cyc_k1", "100"), ("cyc_k2", "200"),
+                ("cyc_k3", "300"), ("cyc_k1", "100"),
+            ]),
+            ("cyc_k2", 200, False, [("cyc_k1", "100"), ("cyc_k2", "200")]),
+            ("cyc_k3", 300, False, [
+                ("cyc_k1", "100"), ("cyc_k2", "200"), ("cyc_k3", "300"),
+            ]),
         ])
-
-        kp1.delete()
-        kp2.delete()
-        kp3.delete()
 
     def test_cycle_with_materialized(self):
         if connection.vendor == "sqlite":
@@ -600,10 +591,6 @@ class TestRecursiveCTE(TestCase):
             ("mat_b", False),
             ("mat_c", False),
         ])
-
-        mat_a.delete()
-        mat_b.delete()
-        mat_c.delete()
 
     def test_cycle_hierarchical_traversal(self):
         if connection.vendor == "sqlite":
@@ -656,8 +643,3 @@ class TestRecursiveCTE(TestCase):
 
         cycle_rows = list(regions.filter(is_cycle=True).values_list("name", flat=True))
         self.assertEqual(cycle_rows, ["node1"])
-
-        node1.delete()
-        node2.delete()
-        node3.delete()
-        node4.delete()
