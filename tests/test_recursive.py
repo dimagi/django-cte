@@ -2,6 +2,8 @@ import pickle
 import re
 from unittest import SkipTest
 
+from django.contrib.postgres.fields import ArrayField
+from django.core.exceptions import FieldError
 from django.db import connection
 from django.db.models import IntegerField, TextField
 from django.db.models.expressions import (
@@ -443,6 +445,42 @@ class TestRecursiveCTE(TestCase):
             ("mc_a", True),
             ("mc_b", False),
         ])
+
+    def test_cycle_using_output_field(self):
+        if connection.vendor == "sqlite":
+            raise SkipTest("SQLite does not support CYCLE clause")
+
+        def make_regions_cte(cte):
+            return Region.objects.filter(
+                parent__isnull=True
+            ).values("name", "parent_id").union(
+                cte.join(Region, parent=cte.col.name).values(
+                    "name", "parent_id",
+                ),
+                all=True,
+            )
+
+        def regions(columns, output_field):
+            cycle = {"columns": columns}
+            if output_field is not None:
+                cycle["using_output_field"] = output_field
+            cte = CTE.recursive(make_regions_cte, cycle=cycle)
+            return with_cte(cte, select=cte.join(Region, name=cte.col.name)
+                            .annotate(path=cte.col.path))
+
+        # the output field decides which lookups are allowed, not the value,
+        # for a single tracked column and for several
+        for columns in (["name"], ["name", "parent_id"]):
+            default = regions(columns, None)
+            array = regions(columns, ArrayField(text_field))
+
+            with self.assertRaises(FieldError):
+                default.filter(path__len=2).count()
+            self.assertEqual(array.filter(path__len=2).count(), 5)
+            self.assertEqual(
+                cycle_path(default.get(name="moon").path),
+                cycle_path(array.get(name="moon").path),
+            )
 
     def test_cycle_with_dict_config(self):
         if connection.vendor == "sqlite":

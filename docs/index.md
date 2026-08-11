@@ -231,10 +231,14 @@ the query verbatim, so a string value must carry its own quotes:
 
 ### Working with the USING Column
 
-PostgreSQL generates the path column as `ARRAY[RECORD]`, where `RECORD` is a
-pseudo-type for unspecified row types. Its `output_field` defaults to
-`TextField` for maximum compatibility. Pass a different one with the
-`using_output_field` key:
+PostgreSQL generates the path column as `ARRAY[RECORD]`, and Django has no
+field for that type. Its `output_field` therefore defaults to `TextField`,
+which applies no conversion and returns whatever the driver produced.
+
+The `using_output_field` key changes the field Django attaches to the column.
+It does not change the returned value, only which lookups are allowed.
+`ArrayField` adds `__len`. Other array lookups compare against the declared
+element type and fail, because the elements are anonymous records:
 
 ```py
 from django.contrib.postgres.fields import ArrayField
