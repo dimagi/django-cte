@@ -1,11 +1,12 @@
 from copy import copy
 
 import django
-from django.db.models import Manager, sql, TextField, BooleanField
+from django.db.models import Manager, sql
 from django.db.models.expressions import Ref
 from django.db.models.query import ModelIterable, Q, QuerySet, ValuesIterable
 from django.db.models.sql.datastructures import BaseTable
 
+from .cycle import CycleConfig
 from .jitmixin import jit_mixin
 from .join import QJoin, INNER
 from .meta import CTEColumnRef, CTEColumns
@@ -43,12 +44,10 @@ class CTE:
     eventually be added.
     :param materialized: Optional parameter (default: None) which generates
     the MATERIALIZED / NOT MATERIALIZED statement for supporting databases.
-    :param cycle: Optional parameter (default: None) to enable cycle detection
-    for recursive CTEs. Can be:
-    - A list/tuple of column names to track for cycles
-    - A dict with 'columns', 'set' (cycle mark column), 'to' (cycle value),
-      'default' (non-cycle value), 'using' (path column), and 'using_output_field'
-      (output field type for the path column, defaults to TextField) keys
+    :param cycle: Optional parameter (default: None) enabling cycle
+    detection for recursive CTEs. Either a sequence of CTE column names to
+    track for cycles, or a dict with 'columns', 'set', 'to', 'default',
+    'using' and 'using_output_field' keys. See `CycleConfig`.
     """
 
     def __init__(self, queryset, name="cte", materialized=None, cycle=None):
@@ -56,7 +55,7 @@ class CTE:
         self.name = name
         self.col = CTEColumns(self)
         self.materialized = materialized
-        self.cycle = cycle
+        self.cycle = CycleConfig.parse(cycle)
 
     def __getstate__(self):
         return (self.query, self.name, self.materialized, self._iterable_class, self.cycle)
@@ -137,29 +136,7 @@ class CTE:
 
         parent = query.get_initial_alias()
         query.join(QJoin(parent, self.name, self.name, on_clause, join_type))
-        
-        # add annotations for CYCLE clause generated columns
-        if self.cycle:
-            cycle_config = self.cycle if isinstance(self.cycle, dict) else {}
-            set_col = cycle_config.get('set', 'is_cycle')
-            using_col = cycle_config.get('using', 'path')
-            # default to TextField and defer to user for specifying correct output_field.
-            # using ArrayField with psycopg2 requires tinkering with list adaption since the USING column
-            # is of type ARRAY[RECORD] and RECORD is a pseudo-type for unspecified row types,
-            # psycopg2 does not convert it to a list automatically as it considers RECORD an unknown type.
-            #
-            # See:
-            # * https://www.psycopg.org/docs/usage.html#lists-adaptation
-            # * https://www.psycopg.org/docs/extensions.html#cast-array-unknown
-            # * https://www.postgresql.org/docs/current/datatype-pseudo.html#DATATYPE-PSEUDO
-            using_output_field = cycle_config.get('using_output_field', TextField())
-            if set_col not in query.annotations:
-                col = CTEColumnRef(set_col, self.name, BooleanField())
-                query.add_annotation(col, set_col)
-            if using_col not in query.annotations:
-                col = CTEColumnRef(using_col, self.name, using_output_field)
-                query.add_annotation(col, using_col)
-
+        self._add_cycle_annotations(query)
         return queryset
 
     def queryset(self):
@@ -202,22 +179,16 @@ class CTE:
                     query.add_annotation(col, alias)
             query.selected = {alias: alias for alias in selected}
 
-        # add annotations for CYCLE clause generated columns
-        if self.cycle:
-            cycle_config = self.cycle if isinstance(self.cycle, dict) else {}
-            set_col = cycle_config.get('set', 'is_cycle')
-            using_col = cycle_config.get('using', 'path')
-            # see comment in join() method about using_output_field
-            using_output_field = cycle_config.get('using_output_field', TextField())
-            if set_col not in query.annotations:
-                col = CTEColumnRef(set_col, self.name, BooleanField())
-                query.add_annotation(col, set_col)
-            if using_col not in query.annotations:
-                col = CTEColumnRef(using_col, self.name, using_output_field)
-                query.add_annotation(col, using_col)
-
+        self._add_cycle_annotations(query)
         qs.query = query
         return qs
+
+    def _add_cycle_annotations(self, query):
+        if self.cycle is None:
+            return
+        for name, output_field in self.cycle.generated_columns.items():
+            if name not in query.annotations:
+                query.add_annotation(CTEColumnRef(name, self.name, output_field), name)
 
     def _resolve_ref(self, column):
         name = column.name
