@@ -194,6 +194,17 @@ WITH RECURSIVE "cte" AS (
 ) CYCLE "name" SET "is_cycle" TO true DEFAULT false USING "path"
 ```
 
+The columns added by the clause are referenced like any other CTE column, with
+`cte.col`:
+
+```py
+regions = with_cte(
+    cte,
+    select=cte.join(Region, name=cte.col.name)
+    .annotate(is_cycle=cte.col.is_cycle, path=cte.col.path)
+)
+```
+
 For more control over the cycle detection behavior, you can pass a dictionary:
 
 ```py
