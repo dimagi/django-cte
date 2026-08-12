@@ -1,5 +1,7 @@
 from django.db.models.sql.constants import INNER
 
+from ._quoting import quote_name
+
 
 class QJoin:
     """Join clause with join condition from Q object clause
@@ -46,11 +48,13 @@ class QJoin:
     def as_sql(self, compiler, connection):
         """Generate join clause SQL"""
         on_clause_sql, params = self.on_clause.as_sql(compiler, connection)
+        qn = quote_name(compiler)
         if self.table_alias == self.table_name:
             alias = ''
         else:
-            alias = ' %s' % self.table_alias
-        qn = compiler.quote_name_unless_alias
+            # Quote the alias like the column references pointing at it,
+            # otherwise the database case-folds one but not the other.
+            alias = ' %s' % qn(self.table_alias)
         sql = '%s %s%s ON %s' % (
             self.join_type,
             qn(self.table_name),

@@ -881,6 +881,30 @@ class TestCTE(TestCase):
             {'name': 'venus', 'total': None}
         ])
 
+    def test_cte_join_alias_is_quoted(self):
+        # A CTE-joined queryset used as a subquery gets its alias prefix
+        # bumped, so the join alias differs from the CTE name and must be
+        # quoted like the column references pointing at it.
+        totals = CTE(
+            Order.objects
+            .values("region_id")
+            .annotate(total=Sum("amount"))
+        )
+        big_orders = with_cte(
+            totals,
+            select=totals.join(Order, region=totals.col.region_id),
+        ).annotate(region_total=totals.col.total).filter(
+            region_id=OuterRef("name"),
+            region_total__gt=100,
+        )
+        regions = Region.objects.filter(Exists(big_orders)).order_by("name")
+        self.assertEqual([r.name for r in regions], [
+            'earth',
+            'mars',
+            'proxima centauri',
+            'sun',
+        ])
+
     def test_fields_with_db_column(self):
         cte = CTE.recursive(
             lambda cte: WithDBColumn.objects.filter(id=10)

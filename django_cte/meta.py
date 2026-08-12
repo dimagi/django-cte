@@ -2,6 +2,8 @@ import weakref
 
 from django.db.models.expressions import Col, Expression
 
+from ._quoting import quote_name
+
 try:
     from django.db.models.expressions import ColPairs as _ColPairs
 except ImportError:
@@ -64,7 +66,7 @@ class CTEColumn(Expression):
         return self._ref.output_field
 
     def as_sql(self, compiler, connection):
-        qn = compiler.quote_name_unless_alias
+        qn = quote_name(compiler)
         ref = self._ref
         column = ref.target.column if isinstance(ref, Col) else self.name
         return "%s.%s" % (qn(self.table_alias), qn(column)), []
@@ -111,7 +113,7 @@ class CTEColumnRef(Expression):
         return clone
 
     def as_sql(self, compiler, connection):
-        qn = compiler.quote_name_unless_alias
+        qn = quote_name(compiler)
         table = self._alias or compiler.query.table_map.get(
             self.cte_name, [self.cte_name])[0]
         return "%s.%s" % (qn(table), qn(self.name)), []

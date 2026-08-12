@@ -4,6 +4,7 @@ from django.db.models.sql.constants import LOUTER
 
 from .jitmixin import JITMixin, jit_mixin
 from .join import QJoin
+from ._quoting import quote_name
 
 # NOTE: it is currently not possible to execute delete queries that
 # reference CTEs without patching `QuerySet.delete` (Django method)
@@ -83,7 +84,7 @@ def generate_cte_sql(connection, query, as_sql):
             connection=connection, elide_empty=should_elide_empty
         )
 
-        qn = compiler.quote_name_unless_alias
+        qn = quote_name(compiler)
         try:
             cte_sql, cte_params = compiler.as_sql()
         except EmptyResultSet:
