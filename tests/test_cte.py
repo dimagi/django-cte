@@ -286,23 +286,34 @@ class TestCTE(TestCase):
             ('sun', 18, 1374),
         ])
 
-    def test_materialized_option(self):
+    def _test_materialized_queryset(self, materialized):
         totals = CTE(
             Order.objects
             .filter(region__parent="sun")
             .values("region_id")
             .annotate(total=Sum("amount")),
-            materialized=True
+            materialized=materialized
         )
-        orders = with_cte(
+        return with_cte(
             totals,
             select=totals.join(Order, region=totals.col.region_id)
             .annotate(region_total=totals.col.total)
             .order_by("amount")
         )
+
+    def test_materialized_query(self):
+        orders = self._test_materialized_queryset(materialized=True)
         self.assertTrue(
             str(orders.query).startswith(
                 'WITH RECURSIVE "cte" AS MATERIALIZED'
+            )
+        )
+
+    def test_not_materialized_query(self):
+        orders = self._test_materialized_queryset(materialized=False)
+        self.assertTrue(
+            str(orders.query).startswith(
+                'WITH RECURSIVE "cte" AS NOT MATERIALIZED'
             )
         )
 

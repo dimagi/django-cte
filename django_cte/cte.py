@@ -1,3 +1,5 @@
+import functools
+import warnings
 from copy import copy
 
 import django
@@ -32,6 +34,21 @@ def with_cte(*ctes, select):
     return select
 
 
+def _check_cte_kwargs(fn):
+    @functools.wraps(fn)
+    def wrapper(*args, _stacklevel=1, **kwargs):
+        if len(args) > 2:
+            warnings.warn(
+                "CTE name and materialized will be keyword-only arguments",
+                DeprecationWarning,
+                stacklevel=_stacklevel + 1,
+            )
+
+        return fn(*args, **kwargs)
+
+    return wrapper
+
+
 class CTE:
     """Common Table Expression
 
@@ -41,26 +58,38 @@ class CTE:
     entities (tables, views, functions, other CTE(s), etc.) referenced
     in the given query as well any query to which this CTE will
     eventually be added.
-    :param materialized: Optional parameter (default: False) which enforce
-    using of MATERIALIZED statement for supporting databases.
+    :param materialized: Optional parameter (default: None) which generates
+    the MATERIALIZED / NOT MATERIALIZED statement for supporting databases.
     """
+    VERSION = 1
 
-    def __init__(self, queryset, name="cte", materialized=False):
+    @_check_cte_kwargs
+    def __init__(self, queryset, name=None, materialized=None):
         self._set_queryset(queryset)
-        self.name = name
+        self.name = name or "cte"
         self.col = CTEColumns(self)
         self.materialized = materialized
 
     def __getstate__(self):
-        return (self.query, self.name, self.materialized, self._iterable_class)
+        return (CTE.VERSION, self.query, self.name, self.materialized, self._iterable_class)
 
     def __setstate__(self, state):
+        if len(state) > 4:
+            version, *state = state
+        else:
+            version = 0
+
         if len(state) == 3:
             # Keep compatibility with the previous serialization method
             self.query, self.name, self.materialized = state
             self._iterable_class = ValuesIterable
         else:
             self.query, self.name, self.materialized, self._iterable_class = state
+
+        # Preserve the previous default of omitting the `MATERIALIZED` clause
+        if version == 0 and self.materialized is False:
+            self.materialized = None
+
         self.col = CTEColumns(self)
 
     def __repr__(self):
@@ -71,7 +100,8 @@ class CTE:
         self._iterable_class = getattr(queryset, "_iterable_class", ValuesIterable)
 
     @classmethod
-    def recursive(cls, make_cte_queryset, name="cte", materialized=False):
+    @_check_cte_kwargs
+    def recursive(cls, make_cte_queryset, name=None, materialized=None):
         """Recursive Common Table Expression
 
         :param make_cte_queryset: Function taking a single argument (a
@@ -82,7 +112,7 @@ class CTE:
         :param materialized: See `materialized` parameter of `__init__`.
         :returns: The fully constructed recursive cte object.
         """
-        cte = cls(None, name, materialized)
+        cte = cls(None, name=name, materialized=materialized)
         cte._set_queryset(make_cte_queryset(cte))
         return cte
 
@@ -196,7 +226,7 @@ class With(CTE):
     @staticmethod
     @deprecated("Use `django_cte.CTE.recursive` instead.")
     def recursive(*args, **kw):
-        return CTE.recursive(*args, **kw)
+        return CTE.recursive(*args, _stacklevel=3, **kw)
 
 
 @deprecated("CTEQuerySet is deprecated. "
