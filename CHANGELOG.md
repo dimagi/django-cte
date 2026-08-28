@@ -1,5 +1,11 @@
 # Django CTE change log
 
+## 4.0.0 - 2026-08-28
+
+- **BREAKING** Dropped support for Python 3.9 (EOL 2025-10-31).
+- Add support for Django 6.1.
+- Fix fields using `db_column`.
+
 ## 3.0.0 - 2026-02-05
 
 - **BREAKING:** on Django 5.2 and later when joining a CTE to a queryset with
