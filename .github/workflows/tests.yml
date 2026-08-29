@@ -45,12 +45,8 @@ jobs:
         python: ${{ fromJSON(needs.configure.outputs.python_versions) }}
         django: ${{ fromJSON(needs.configure.outputs.django_versions) }}
         exclude:
-        - {python: '3.9', django: 'Django~=5.1.0'}
-        - {python: '3.9', django: 'Django~=5.2.0'}
-        - {python: '3.9', django: 'Django~=6.0.0'}
         - {python: '3.10', django: 'Django~=6.0.0'}
         - {python: '3.11', django: 'Django~=6.0.0'}
-        - {python: '3.9', django: 'Django~=6.1.0'}
         - {python: '3.10', django: 'Django~=6.1.0'}
         - {python: '3.11', django: 'Django~=6.1.0'}
     env:
