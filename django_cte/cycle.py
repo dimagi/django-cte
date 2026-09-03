@@ -1,0 +1,97 @@
+from django.db.models import BooleanField, TextField
+
+DICT_KEYS = frozenset([
+    "columns", "set", "to", "default", "using", "using_output_field",
+])
+
+
+class CycleConfig:
+    """CYCLE clause configuration of a recursive CTE
+
+    The `generated_columns` attribute maps the names of the columns added
+    by the clause to their output fields.
+
+    :param columns: Sequence of CTE column names to track for cycles.
+    :param mark_column: Name of the generated cycle mark column
+    (default: "is_cycle").
+    :param cycle_value: SQL literal assigned to the mark column when a
+    cycle is detected (default: "true"). Interpolated into the query as
+    written, so a string value must include its own quotes.
+    :param default_value: SQL literal assigned to the mark column when no
+    cycle is detected (default: "false"). Interpolated as written.
+    :param path_column: Name of the generated path column (default:
+    "path").
+    :param path_output_field: Output field of the path column (default:
+    `TextField()`). PostgreSQL generates the column as `ARRAY[RECORD]`,
+    and `RECORD` is a pseudo-type for unspecified row types, which
+    psycopg2 does not adapt to a list because it considers `RECORD`
+    unknown. Pass an `ArrayField` and configure list adaptation to get
+    anything other than text.
+
+    See:
+    * https://www.psycopg.org/docs/usage.html#lists-adaptation
+    * https://www.psycopg.org/docs/extensions.html#cast-array-unknown
+    * https://www.postgresql.org/docs/current/datatype-pseudo.html#DATATYPE-PSEUDO
+    """
+
+    def __init__(self, columns, mark_column="is_cycle", cycle_value="true",
+                 default_value="false", path_column="path",
+                 path_output_field=None):
+        if not columns:
+            raise ValueError("CYCLE requires at least one column")
+        self.columns = tuple(columns)
+        self.mark_column = mark_column
+        self.cycle_value = cycle_value
+        self.default_value = default_value
+        self.path_column = path_column
+        self.path_output_field = path_output_field or TextField()
+        self.generated_columns = {
+            self.mark_column: BooleanField(),
+            self.path_column: self.path_output_field,
+        }
+
+    @classmethod
+    def parse(cls, cycle):
+        """Get a config from the `cycle` argument of `CTE`
+
+        :param cycle: A `CycleConfig`, a sequence of column names, a dict
+        of `CycleConfig` keyword arguments by their public key names, or
+        None.
+        :returns: A `CycleConfig` or None.
+        """
+        if cycle is None or isinstance(cycle, cls):
+            return cycle
+        if isinstance(cycle, (list, tuple)):
+            return cls(cycle)
+        if isinstance(cycle, dict):
+            unknown = set(cycle) - DICT_KEYS
+            if unknown:
+                raise ValueError(
+                    f"Unknown cycle option(s): {', '.join(sorted(unknown))}. "
+                    f"Valid options are: {', '.join(sorted(DICT_KEYS))}"
+                )
+            return cls(
+                cycle.get("columns", ()),
+                mark_column=cycle.get("set", "is_cycle"),
+                cycle_value=cycle.get("to", "true"),
+                default_value=cycle.get("default", "false"),
+                path_column=cycle.get("using", "path"),
+                path_output_field=cycle.get("using_output_field"),
+            )
+        raise ValueError(
+            "cycle must be a sequence of column names or a dict, "
+            f"got {type(cycle).__name__}"
+        )
+
+    def as_sql(self, qn):
+        """Get the CYCLE clause SQL
+
+        :param qn: Name quoting function.
+        :returns: The CYCLE clause SQL string.
+        """
+        return (
+            f"CYCLE {', '.join(qn(c) for c in self.columns)} "
+            f"SET {qn(self.mark_column)} "
+            f"TO {self.cycle_value} DEFAULT {self.default_value} "
+            f"USING {qn(self.path_column)}"
+        )

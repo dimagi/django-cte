@@ -93,7 +93,7 @@ def generate_cte_sql(connection, query, as_sql):
             # like, col_count and klass_info.
             as_sql()
             raise
-        template = get_cte_query_template(cte)
+        template = get_cte_query_template(cte, qn)
         ctes.append(template.format(name=qn(cte.name), query=cte_sql))
         params.extend(cte_params)
 
@@ -130,10 +130,16 @@ def generate_cte_sql(connection, query, as_sql):
     return " ".join(sql), tuple(params)
 
 
-def get_cte_query_template(cte):
+def get_cte_query_template(cte, qn):
+    template = "{name} AS"
     if cte.materialized:
-        return "{name} AS MATERIALIZED ({query})"
-    return "{name} AS ({query})"
+        template += " MATERIALIZED"
+    template += " ({query})"
+
+    if cte.cycle is not None:
+        template += " " + cte.cycle.as_sql(qn)
+
+    return template
 
 
 def _ignore_with_col_aliases(cte_query):
