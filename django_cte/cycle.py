@@ -5,10 +5,10 @@ DICT_KEYS = frozenset([
 ])
 
 
-class CycleConfig:
-    """CYCLE clause configuration of a recursive CTE
+class CycleClause:
+    """CYCLE clause of a recursive CTE
 
-    The `generated_columns` attribute maps the names of the columns added
+    The `output_columns` attribute maps the names of the columns added
     by the clause to their output fields.
 
     :param columns: Sequence of CTE column names to track for cycles.
@@ -45,19 +45,19 @@ class CycleConfig:
         self.default_value = default_value
         self.path_column = path_column
         self.path_output_field = path_output_field or TextField()
-        self.generated_columns = {
+        self.output_columns = {
             self.mark_column: BooleanField(),
             self.path_column: self.path_output_field,
         }
 
     @classmethod
     def parse(cls, cycle):
-        """Get a config from the `cycle` argument of `CTE`
+        """Get a clause from the `cycle` argument of `CTE.recursive`
 
-        :param cycle: A `CycleConfig`, a sequence of column names, a dict
-        of `CycleConfig` keyword arguments by their public key names, or
+        :param cycle: A `CycleClause`, a sequence of column names, a dict
+        of `CycleClause` keyword arguments by their public key names, or
         None.
-        :returns: A `CycleConfig` or None.
+        :returns: A `CycleClause` or None.
         """
         if cycle is None or isinstance(cycle, cls):
             return cycle
