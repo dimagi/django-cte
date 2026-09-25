@@ -163,8 +163,8 @@ repeats. Support was added in PostgreSQL 14. On earlier versions, and on
 databases without it such as SQLite, cycle detection must be implemented in
 application logic.
 
-Pass the `cycle` parameter to `CTE()` or `CTE.recursive()`, naming the CTE
-column(s) that identify a row:
+Pass the `cycle` parameter to `CTE.recursive()`, naming the CTE column(s)
+that identify a row:
 
 ```py
 def make_regions_cte(cte):

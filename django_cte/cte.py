@@ -44,18 +44,14 @@ class CTE:
     eventually be added.
     :param materialized: Optional parameter (default: False) which enforce
     using of MATERIALIZED statement for supporting databases.
-    :param cycle: Optional parameter (default: None) enabling cycle
-    detection for recursive CTEs. Either a sequence of CTE column names to
-    track for cycles, or a dict with 'columns', 'set', 'to', 'default',
-    'using' and 'using_output_field' keys. See `CycleConfig`.
     """
 
-    def __init__(self, queryset, name="cte", materialized=False, cycle=None):
+    def __init__(self, queryset, name="cte", materialized=False):
         self._set_queryset(queryset)
         self.name = name
         self.col = CTEColumns(self)
         self.materialized = materialized
-        self.cycle = CycleConfig.parse(cycle)
+        self.cycle = None
 
     def __getstate__(self):
         return (self.query, self.name, self.materialized, self._iterable_class, self.cycle)
@@ -90,10 +86,14 @@ class CTE:
         statement unioned with a recursive statement.
         :param name: See `name` parameter of `__init__`.
         :param materialized: See `materialized` parameter of `__init__`.
-        :param cycle: See `cycle` parameter of `__init__`.
+        :param cycle: Optional parameter (default: None) enabling cycle
+        detection. Either a sequence of CTE column names to track for
+        cycles, or a dict with 'columns', 'set', 'to', 'default', 'using'
+        and 'using_output_field' keys. See `CycleConfig`.
         :returns: The fully constructed recursive cte object.
         """
-        cte = cls(None, name, materialized, cycle)
+        cte = cls(None, name, materialized)
+        cte.cycle = CycleConfig.parse(cycle)
         cte._set_queryset(make_cte_queryset(cte))
         return cte
 
