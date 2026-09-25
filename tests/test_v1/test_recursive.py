@@ -202,6 +202,12 @@ class TestRecursiveCTE(TestCase):
         self.assertEqual(data, ['earth', 'moon', 'sun'])
 
     def test_pickle_recursive_cte_queryset(self):
+        """
+        Pickle and *use* a queryset since Django loads the queryset into
+        memory and pickles the values, and any tests using the cached values
+        will not test pickling correctly.
+        """
+
         def make_regions_cte(cte):
             return Region.objects.filter(
                 parent__isnull=True
@@ -213,14 +219,20 @@ class TestRecursiveCTE(TestCase):
                 ),
                 all=True,
             )
+
+        def use_qs(qs):
+            return [
+                (r.name, r.depth) for r in qs.filter(depth=2).order_by("name")
+            ]
+
         cte = With.recursive(make_regions_cte)
-        regions = cte.queryset().with_cte(cte).filter(depth=2).order_by("name")
+        regions = cte.queryset().with_cte(cte)
+        expected = [('deimos', 2), ('moon', 2), ('phobos', 2)]
 
         pickled_qs = pickle.loads(pickle.dumps(regions))
 
-        data = [(r.name, r.depth) for r in pickled_qs]
-        self.assertEqual(data, [(r.name, r.depth) for r in regions])
-        self.assertEqual(data, [('deimos', 2), ('moon', 2), ('phobos', 2)])
+        self.assertEqual(use_qs(regions), expected)
+        self.assertEqual(use_qs(pickled_qs), expected)
 
     def test_alias_change_in_annotation(self):
         def make_regions_cte(cte):

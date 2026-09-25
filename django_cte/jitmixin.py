@@ -22,7 +22,14 @@ _mixin_cache = {}
 
 
 class JITMixin:
-
     def __reduce__(self):
-        # make JITMixin classes pickleable
-        return (jit_mixin_type, (self._jit_mixin_base, *self._jit_mixins))
+        return (
+            _jit_mixin_unpickle,
+            (self._jit_mixin_base, *self._jit_mixins),
+            self.__getstate__()
+        )
+
+
+def _jit_mixin_unpickle(base, *mixins):
+    cls = jit_mixin_type(base, *mixins)
+    return cls.__new__(cls)
