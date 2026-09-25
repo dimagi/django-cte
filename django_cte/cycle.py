@@ -37,6 +37,11 @@ class CycleClause:
     def __init__(self, columns, mark_column="is_cycle", cycle_value="true",
                  default_value="false", path_column="path",
                  path_output_field=None):
+        if isinstance(columns, str):
+            raise ValueError(
+                "CYCLE columns must be a sequence of column names, "
+                "not a string"
+            )
         if not columns:
             raise ValueError("CYCLE requires at least one column")
         self.columns = tuple(columns)
@@ -58,6 +63,7 @@ class CycleClause:
         of `CycleClause` keyword arguments by their public key names, or
         None.
         :returns: A `CycleClause` or None.
+        :raises: `ValueError` for invalid/unknown configuration.
         """
         if cycle is None or isinstance(cycle, cls):
             return cycle
