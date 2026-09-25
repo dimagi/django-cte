@@ -21,11 +21,6 @@ def jit_mixin_type(base, *mixins):
 _mixin_cache = {}
 
 
-def _jit_mixin_unpickle(base, *mixins):
-    cls = jit_mixin_type(base, *mixins)
-    return cls.__new__(cls)
-
-
 class JITMixin:
     def __reduce__(self):
         return (
@@ -33,3 +28,8 @@ class JITMixin:
             (self._jit_mixin_base, *self._jit_mixins),
             self.__getstate__()
         )
+
+
+def _jit_mixin_unpickle(base, *mixins):
+    cls = jit_mixin_type(base, *mixins)
+    return cls.__new__(cls)
