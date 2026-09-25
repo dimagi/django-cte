@@ -21,6 +21,7 @@ from django.db.utils import DatabaseError
 from django.test import TestCase
 
 from django_cte import CTE, with_cte
+from django_cte.cycle import CycleClause
 
 from .models import KeyPair, Region
 
@@ -669,3 +670,12 @@ class TestRecursiveCTE(TestCase):
 
         cycle_rows = list(regions.filter(is_cycle=True).values_list("name", flat=True))
         self.assertEqual(cycle_rows, ["node1"])
+
+    def test_cycle_invalid_options(self):
+        for cycle, message in [
+            ("name", "got str"),
+            ({"columns": "name"}, "not a string"),
+        ]:
+            with self.subTest(cycle=cycle):
+                with self.assertRaisesRegex(ValueError, message):
+                    CycleClause.parse(cycle)
