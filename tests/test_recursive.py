@@ -671,6 +671,19 @@ class TestRecursiveCTE(TestCase):
         cycle_rows = list(regions.filter(is_cycle=True).values_list("name", flat=True))
         self.assertEqual(cycle_rows, ["node1"])
 
+    def test_cycle_clause_with_braces(self):
+        def make_regions_cte(cte):
+            return Region.objects.filter(name="sun").values("name").union(
+                cte.join(Region, parent=cte.col.name).values("name"),
+                all=True,
+            )
+
+        cte = CTE.recursive(
+            make_regions_cte, cycle={"columns": ["name"], "set": "{mark}"}
+        )
+        regions = with_cte(cte, select=cte.join(Region, name=cte.col.name))
+        self.assertIn('SET "{mark}"', str(regions.query))
+
     def test_cycle_invalid_options(self):
         for cycle, message in [
             ("name", "got str"),
