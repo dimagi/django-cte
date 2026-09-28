@@ -228,7 +228,20 @@ WITH RECURSIVE "cte" AS (
 `to` and `default` take a bool, int, float, str, date or datetime. PostgreSQL
 does not accept query parameters in their place, so they are written into the
 SQL as constants. The type of `to` decides the output field of the mark column,
-here `TextField`.
+here `TextField`. A `Value()` is taken like its value, with its own output
+field. Other constants can be passed as `RawSQL()` without params, which is
+written into the SQL as is:
+
+```py
+from django.db.models import DurationField
+from django.db.models.expressions import RawSQL
+
+cycle = {
+    "columns": ["name"],
+    "to": RawSQL("interval '1 day'", [], output_field=DurationField()),
+    "default": RawSQL("interval '0'", [], output_field=DurationField()),
+}
+```
 
 ### Working with the USING Column
 
