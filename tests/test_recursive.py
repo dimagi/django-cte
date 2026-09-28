@@ -388,10 +388,7 @@ class TestRecursiveCTE(TestCase):
         query_str = str(regions.query)
         print(query_str)
 
-        self.assertIn('CYCLE "name"', query_str)
-        self.assertIn('SET "is_cycle"', query_str)
-        self.assertIn("TO true DEFAULT false", query_str)
-        self.assertIn('USING "cycle_path"', query_str)
+        self.assertIn('CYCLE "name" SET "is_cycle" USING "cycle_path"', query_str)
 
         data = list(regions.values_list("name", "is_cycle"))
         self.assertEqual(data, [
