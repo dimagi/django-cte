@@ -14,6 +14,7 @@ from django.db.models.expressions import (
     F,
     OuterRef,
     Q,
+    RawSQL,
     Value,
     When,
 )
@@ -713,6 +714,12 @@ class TestRecursiveCTE(TestCase):
                 "TO timestamptz '2020-01-01T00:00:00+00:00' "
                 "DEFAULT timestamptz '1970-01-01T00:00:00+00:00'",
             ),
+            (Value("Y"), Value("N"), "TO 'Y' DEFAULT 'N'"),
+            (
+                RawSQL("int2 '1'", [], output_field=int_field),
+                RawSQL("int2 '0'", [], output_field=int_field),
+                "TO int2 '1' DEFAULT int2 '0'",
+            ),
         ]:
             with self.subTest(to=to):
                 cte = CTE.recursive(make_regions_cte, cycle={
@@ -738,6 +745,16 @@ class TestRecursiveCTE(TestCase):
                 all=True,
             )
 
+        def regions(to, default):
+            cte = CTE.recursive(make_regions_cte, cycle={
+                "columns": ["name"], "to": to, "default": default,
+            })
+            return with_cte(
+                cte,
+                select=cte.join(Region, name=cte.col.name)
+                .annotate(is_cycle=cte.col.is_cycle)
+            ).values_list("name", "is_cycle")
+
         # the output field of each type must allow filtering by the value
         for to, default in [
             (1, 0),
@@ -748,20 +765,24 @@ class TestRecursiveCTE(TestCase):
             (datetime(2020, 1, 1, 10, 30), datetime(1970, 1, 1)),
         ]:
             with self.subTest(to=to):
-                cte = CTE.recursive(make_regions_cte, cycle={
-                    "columns": ["name"], "to": to, "default": default,
-                })
-                regions = with_cte(
-                    cte,
-                    select=cte.join(Region, name=cte.col.name)
-                    .annotate(is_cycle=cte.col.is_cycle)
-                )
-                data = list(
-                    regions.filter(is_cycle=to).values_list("name", "is_cycle")
-                )
+                data = list(regions(to, default).filter(is_cycle=to))
                 self.assertEqual(data, [("mv_a", to)])
                 self.assertIs(type(data[0][1]), type(to))
-                self.assertEqual(regions.filter(is_cycle=default).count(), 2)
+                self.assertEqual(
+                    regions(to, default).filter(is_cycle=default).count(), 2
+                )
+
+        for to, default, value in [
+            (Value("Y"), Value("N"), "Y"),
+            (
+                RawSQL("int2 '1'", [], output_field=int_field),
+                RawSQL("int2 '0'", [], output_field=int_field),
+                1,
+            ),
+        ]:
+            with self.subTest(to=to):
+                data = list(regions(to, default).filter(is_cycle=value))
+                self.assertEqual(data, [("mv_a", value)])
 
     def test_cycle_invalid_options(self):
         for cycle, message in [
@@ -769,6 +790,8 @@ class TestRecursiveCTE(TestCase):
             ({"columns": "name"}, "not a string"),
             ({"columns": ["name"], "to": None}, "got None"),
             ({"columns": ["name"], "default": b"N"}, "got b'N'"),
+            ({"columns": ["name"], "to": Value(None)}, "got None"),
+            ({"columns": ["name"], "to": RawSQL("%s", [1])}, "params"),
         ]:
             with self.subTest(cycle=cycle):
                 with self.assertRaisesRegex(ValueError, message):

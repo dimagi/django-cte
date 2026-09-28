@@ -8,6 +8,7 @@ from django.db.models import (
     IntegerField,
     TextField,
 )
+from django.db.models.expressions import RawSQL, Value
 from django.utils import timezone
 
 DICT_KEYS = frozenset([
@@ -26,7 +27,9 @@ class CycleClause:
     (default: "is_cycle").
     :param cycle_value: Value of the mark column when a cycle is detected
     (default: True). A bool, int, float, str, date or datetime. Its type
-    decides the output field of the mark column.
+    decides the output field of the mark column. A `Value` is taken like
+    its value, but with its output field. A `RawSQL` without params is
+    written into the query as is, for other constants.
     :param default_value: Value of the mark column when no cycle is
     detected (default: False).
     :param path_column: Name of the generated path column (default:
@@ -121,6 +124,13 @@ def compile_mark_value(value):
     PostgreSQL accepts only constants in TO and DEFAULT, not parameters
     or casts, so the value is written into the SQL.
     """
+    if isinstance(value, Value):
+        sql, _ = compile_mark_value(value.value)
+        return sql, value.output_field
+    if isinstance(value, RawSQL):
+        if value.params:
+            raise ValueError("CYCLE mark RawSQL must not have params")
+        return value.sql, value.output_field
     if isinstance(value, bool):
         return ("true" if value else "false"), BooleanField()
     if isinstance(value, int):
@@ -139,8 +149,8 @@ def compile_mark_value(value):
     if isinstance(value, datetime.date):
         return f"date '{value.isoformat()}'", DateField()
     raise ValueError(
-        "CYCLE mark values must be a bool, int, float, str, date or "
-        f"datetime, got {value!r}"
+        "CYCLE mark values must be a bool, int, float, str, date, "
+        f"datetime, Value or RawSQL, got {value!r}"
     )
 
 
