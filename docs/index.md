@@ -210,8 +210,8 @@ cte = CTE.recursive(
     cycle={
         "columns": ["name", "parent_id"],  # columns to track
         "set": "cycle_detected",           # mark column name
-        "to": "1",                         # SQL literal when cycle detected
-        "default": "0",                    # SQL literal when no cycle
+        "to": "Y",                         # mark value when a cycle is detected
+        "default": "N",                    # mark value otherwise
         "using": "cycle_path",             # path column name
     }
 )
@@ -222,12 +222,13 @@ This generates:
 ```sql
 WITH RECURSIVE "cte" AS (
     ...
-) CYCLE "name", "parent_id" SET "cycle_detected" TO 1 DEFAULT 0 USING "cycle_path"
+) CYCLE "name", "parent_id" SET "cycle_detected" TO 'Y' DEFAULT 'N' USING "cycle_path"
 ```
 
-Column names are quoted, but `to` and `default` are SQL literals written into
-the query verbatim, so a string value must carry its own quotes:
-`"to": "'yes'"`. The mark column takes its type from these two literals.
+`to` and `default` take a bool, int, float, str, date or datetime. PostgreSQL
+does not accept query parameters in their place, so they are written into the
+SQL as constants. The type of `to` decides the output field of the mark column,
+here `TextField`.
 
 ### Working with the USING Column
 

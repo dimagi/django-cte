@@ -1,5 +1,6 @@
 import pickle
 import re
+from datetime import date, datetime, timezone
 from unittest import SkipTest
 
 from django.contrib.postgres.fields import ArrayField
@@ -491,8 +492,8 @@ class TestRecursiveCTE(TestCase):
         cycle_config = {
             "columns": ["name"],
             "set": "cycle_detected",
-            "to": "1",
-            "default": "0",
+            "to": "Y",
+            "default": "N",
             "using": "cycle_path",
         }
         cte = CTE.recursive(make_regions_cte, cycle=cycle_config)
@@ -511,7 +512,7 @@ class TestRecursiveCTE(TestCase):
 
         self.assertIn('CYCLE "name"', query_str)
         self.assertIn('SET "cycle_detected"', query_str)
-        self.assertIn("TO 1 DEFAULT 0", query_str)
+        self.assertIn("TO 'Y' DEFAULT 'N'", query_str)
         self.assertIn('USING "cycle_path"', query_str)
 
         data = [
@@ -522,13 +523,13 @@ class TestRecursiveCTE(TestCase):
         # the second alpha row is where the cycle is detected: its path is the
         # full cycle, and every other path is the walk down to that row
         self.assertEqual(data, [
-            ("alpha", 0, [("alpha",)]),
-            ("alpha", 1, [
+            ("alpha", "N", [("alpha",)]),
+            ("alpha", "Y", [
                 ("alpha",), ("beta",), ("gamma",), ("delta",), ("alpha",),
             ]),
-            ("beta", 0, [("alpha",), ("beta",)]),
-            ("delta", 0, [("alpha",), ("beta",), ("gamma",), ("delta",)]),
-            ("gamma", 0, [("alpha",), ("beta",), ("gamma",)]),
+            ("beta", "N", [("alpha",), ("beta",)]),
+            ("delta", "N", [("alpha",), ("beta",), ("gamma",), ("delta",)]),
+            ("gamma", "N", [("alpha",), ("beta",), ("gamma",)]),
         ])
 
     def test_cycle_with_multiple_columns(self):
@@ -684,10 +685,90 @@ class TestRecursiveCTE(TestCase):
         regions = with_cte(cte, select=cte.join(Region, name=cte.col.name))
         self.assertIn('SET "{mark}"', str(regions.query))
 
+    def test_cycle_mark_value_sql(self):
+        def make_regions_cte(cte):
+            return Region.objects.filter(name="sun").values("name").union(
+                cte.join(Region, parent=cte.col.name).values("name"),
+                all=True,
+            )
+
+        for to, default, sql in [
+            (1, 0, "TO 1 DEFAULT 0"),
+            (-1, 0, "TO bigint '-1' DEFAULT 0"),
+            (1.5, 0.5, "TO float8 '1.5' DEFAULT float8 '0.5'"),
+            ("it's", "50%", "TO 'it''s' DEFAULT '50%'"),
+            ("a\\b", "{x}", "TO E'a\\\\b' DEFAULT '{x}'"),
+            (
+                date(2020, 1, 1), date(1970, 1, 1),
+                "TO date '2020-01-01' DEFAULT date '1970-01-01'",
+            ),
+            (
+                datetime(2020, 1, 1, 10, 30), datetime(1970, 1, 1),
+                "TO timestamp '2020-01-01T10:30:00' "
+                "DEFAULT timestamp '1970-01-01T00:00:00'",
+            ),
+            (
+                datetime(2020, 1, 1, tzinfo=timezone.utc),
+                datetime(1970, 1, 1, tzinfo=timezone.utc),
+                "TO timestamptz '2020-01-01T00:00:00+00:00' "
+                "DEFAULT timestamptz '1970-01-01T00:00:00+00:00'",
+            ),
+        ]:
+            with self.subTest(to=to):
+                cte = CTE.recursive(make_regions_cte, cycle={
+                    "columns": ["name"], "to": to, "default": default,
+                })
+                regions = with_cte(
+                    cte, select=cte.join(Region, name=cte.col.name)
+                )
+                self.assertIn(sql, str(regions.query))
+
+    def test_cycle_mark_values(self):
+        if connection.vendor == "sqlite":
+            raise SkipTest("SQLite does not support CYCLE clause")
+
+        mv_a = Region.objects.create(name="mv_a", parent=None)
+        Region.objects.create(name="mv_b", parent=mv_a)
+        mv_a.parent_id = "mv_b"
+        mv_a.save()
+
+        def make_regions_cte(cte):
+            return Region.objects.filter(name="mv_a").values("name").union(
+                cte.join(Region, parent=cte.col.name).values("name"),
+                all=True,
+            )
+
+        # the output field of each type must allow filtering by the value
+        for to, default in [
+            (1, 0),
+            (-1, 0),
+            (1.5, -0.5),
+            ("it's 50% {x} \\' --", "no"),
+            (date(2020, 1, 1), date(1970, 1, 1)),
+            (datetime(2020, 1, 1, 10, 30), datetime(1970, 1, 1)),
+        ]:
+            with self.subTest(to=to):
+                cte = CTE.recursive(make_regions_cte, cycle={
+                    "columns": ["name"], "to": to, "default": default,
+                })
+                regions = with_cte(
+                    cte,
+                    select=cte.join(Region, name=cte.col.name)
+                    .annotate(is_cycle=cte.col.is_cycle)
+                )
+                data = list(
+                    regions.filter(is_cycle=to).values_list("name", "is_cycle")
+                )
+                self.assertEqual(data, [("mv_a", to)])
+                self.assertIs(type(data[0][1]), type(to))
+                self.assertEqual(regions.filter(is_cycle=default).count(), 2)
+
     def test_cycle_invalid_options(self):
         for cycle, message in [
             ("name", "got str"),
             ({"columns": "name"}, "not a string"),
+            ({"columns": ["name"], "to": None}, "got None"),
+            ({"columns": ["name"], "default": b"N"}, "got b'N'"),
         ]:
             with self.subTest(cycle=cycle):
                 with self.assertRaisesRegex(ValueError, message):
