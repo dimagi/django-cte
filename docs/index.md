@@ -183,7 +183,7 @@ This generates a `CYCLE` clause with default settings:
 ```sql
 WITH RECURSIVE "cte" AS (
     ...
-) CYCLE "name" SET "is_cycle" TO true DEFAULT false USING "path"
+) CYCLE "name" SET "is_cycle" USING "path"
 ```
 
 The clause adds two columns to the CTE: a mark column, `is_cycle`, which is

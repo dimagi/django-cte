@@ -110,12 +110,14 @@ class CycleClause:
         :param qn: Name quoting function.
         :returns: The CYCLE clause SQL string.
         """
-        return (
-            f"CYCLE {', '.join(qn(c) for c in self.columns)} "
-            f"SET {qn(self.mark_column)} "
-            f"TO {self.cycle_sql} DEFAULT {self.default_sql} "
-            f"USING {qn(self.path_column)}"
-        )
+        sql = [
+            "CYCLE", ", ".join(qn(c) for c in self.columns),
+            "SET", qn(self.mark_column),
+        ]
+        if self.cycle_value is not True or self.default_value is not False:
+            sql.extend(["TO", self.cycle_sql, "DEFAULT", self.default_sql])
+        sql.extend(["USING", qn(self.path_column)])
+        return " ".join(sql)
 
 
 def compile_mark_value(value):
