@@ -93,8 +93,12 @@ def generate_cte_sql(connection, query, as_sql):
             # like, col_count and klass_info.
             as_sql()
             raise
-        template = get_cte_query_template(cte, qn)
-        ctes.append(template.format(name=qn(cte.name), query=cte_sql))
+        template = get_cte_query_template(cte)
+        cte_sql = template.format(name=qn(cte.name), query=cte_sql)
+        if cte.cycle is not None:
+            # appended after format() because the clause may contain braces
+            cte_sql += " " + cte.cycle.as_sql(qn)
+        ctes.append(cte_sql)
         params.extend(cte_params)
 
     explain_attribute = "explain_info"
@@ -130,7 +134,7 @@ def generate_cte_sql(connection, query, as_sql):
     return " ".join(sql), tuple(params)
 
 
-def get_cte_query_template(cte, qn):
+def get_cte_query_template(cte):
     if cte.materialized:
         materialized = "MATERIALIZED "
     elif cte.materialized is False:
@@ -138,12 +142,7 @@ def get_cte_query_template(cte, qn):
     else:
         materialized = ""
 
-    template = f"{{name}} AS {materialized}({{query}})"
-
-    if cte.cycle is not None:
-        template += " " + cte.cycle.as_sql(qn)
-
-    return template
+    return f"{{name}} AS {materialized}({{query}})"
 
 
 def _ignore_with_col_aliases(cte_query):
