@@ -39,6 +39,12 @@ dev = [
     "pytest-unmagic",
     "ruff",
 ]
+# Kept out of `dev`, so the test matrix does not install them.
+typing = [
+    "basedpyright",
+    "django-stubs",
+    "mypy",
+]
 
 [project.urls]
 Home = "https://github.com/dimagi/django-cte"

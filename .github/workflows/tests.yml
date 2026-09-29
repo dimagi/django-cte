@@ -93,3 +93,36 @@ jobs:
       continue-on-error: ${{ matrix.python == env.allowed_python_failure }}
     - name: Check style
       run: .venv/bin/ruff check
+
+  stubs:
+    # The package ships hand-written .pyi stubs next to untyped .py
+    # modules; stubtest fails when the two drift apart (missing or
+    # renamed names, mismatching signatures). One Python and Django
+    # version suffices: the stubs do not vary between them. The runtime
+    # does vary, as `@deprecated` differs from Python 3.13 on, so keep
+    # the Python version in sync with stubtest-whitelist.txt: some of
+    # its entries only apply to 3.13+, and unused entries fail stubtest.
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: astral-sh/setup-uv@v6
+      with:
+        version: '>=0.7'
+        python-version: '3.13'
+    - name: Setup
+      run: uv sync --locked --group typing
+    - name: Check type stubs
+      run: >-
+        .venv/bin/python -m mypy.stubtest django_cte
+        --allowlist stubtest-whitelist.txt
+    - name: Check type stubs with basedpyright
+      # stubtest only type-checks the stubs with mypy; pyright (used by
+      # Pylance and most editors) differs from mypy on overloads,
+      # variance and `self` types, so check the stubs with it as well.
+      # `--pythonpath` points it to the venv holding django-stubs.
+      # basedpyright's strict defaults apply, and warnings fail the job
+      # too: the stubs carry `# pyright: ignore[...]` comments where
+      # they break a rule on purpose (e.g. explicit `Any`).
+      run: >-
+        .venv/bin/basedpyright --pythonpath .venv/bin/python
+        django_cte/*.pyi

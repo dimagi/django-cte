@@ -1,0 +1,24 @@
+# Whitelist for `python -m mypy.stubtest django_cte`, see the "Check
+# type stubs" step in .github/workflows/tests.yml.
+# Each entry is a stubtest false positive: the runtime and the stubs
+# agree, but stubtest does not see it.
+# The entries match the Python version of that step (3.13): stubtest
+# also fails on unused entries, and some entries only apply to 3.13+.
+
+# The stub gets `__class_getitem__` from `Generic[_QS_co]`; at runtime
+# `CTE` is not a `Generic` subclass and defines it directly instead.
+django_cte.cte.CTE.__class_getitem__
+
+# `@deprecated` sets `__deprecated__` on the decorated class at runtime;
+# in the stubs the same decorator marks the classes for type checkers
+# without declaring the attribute.
+django_cte.cte.CTEManager.__deprecated__
+django_cte.cte.CTEQuerySet.__deprecated__
+django_cte.cte.With.__deprecated__
+
+# On Python 3.13+, `@deprecated` is `warnings.deprecated`, which wraps
+# the decorated class's `__init_subclass__` in a `(*args, **kwargs)`
+# function at runtime; the stubs keep the inherited signature.
+django_cte.cte.CTEManager.__init_subclass__
+django_cte.cte.CTEQuerySet.__init_subclass__
+django_cte.cte.With.__init_subclass__
