@@ -760,6 +760,14 @@ class TestRecursiveCTE(TestCase):
                 data = list(regions(to, default).filter(is_cycle=value))
                 self.assertEqual(data, [("mv_a", value)])
 
+        # with USE_TZ = False an aware datetime comes back naive, so only
+        # filter by it
+        aware = datetime(2020, 1, 1, tzinfo=timezone.utc)
+        aware_default = datetime(1970, 1, 1, tzinfo=timezone.utc)
+        aware_regions = regions(aware, aware_default)
+        self.assertEqual(aware_regions.filter(is_cycle=aware).count(), 1)
+        self.assertEqual(aware_regions.filter(is_cycle=aware_default).count(), 2)
+
     def test_cycle_invalid_options(self):
         for cycle, message in [
             ("name", "got str"),
