@@ -87,9 +87,9 @@ class CTE:
         :param name: See `name` parameter of `__init__`.
         :param materialized: See `materialized` parameter of `__init__`.
         :param cycle: Optional parameter (default: None) enabling cycle
-        detection. Either a sequence of CTE column names to track for
-        cycles, or a dict with 'columns', 'set', 'to', 'default', 'using'
-        and 'using_output_field' keys. See `CycleClause`.
+        detection. Either a list or tuple of CTE column names to track for
+        cycles, a dict with 'columns', 'set', 'to', 'default', 'using' and
+        'using_output_field' keys, or a `CycleClause`.
         :returns: The fully constructed recursive cte object.
         """
         cte = cls(None, name, materialized)
