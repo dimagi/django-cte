@@ -50,8 +50,18 @@ build-backend = "flit_core.buildapi"
 [tool.flit.module]
 name = "django_cte"
 
-[tool.distutils.bdist_wheel]
-universal = true
+[tool.pytest]
+minversion = "9.0"
+addopts = [
+    "--strict-markers",
+]
+filterwarnings = [
+    "error::DeprecationWarning",
+    # stacklevel is incorrect and warning should be emitted in `unmagic`
+    "default::pytest.PytestRemovedIn10Warning:_pytest",
+    # in case Pytest fixes ^^^ this is where the warning will be emitted
+    "default::pytest.PytestRemovedIn10Warning:unmagic",
+]
 
 [tool.tox]
 requires = ["tox>=4.43"]
@@ -65,7 +75,12 @@ env_list = [
 
 [tool.tox.env_run_base]
 default_base_python = "python3"
-commands = [["pytest", {replace = "posargs", default = [], extend = true}]]
+commands = [[
+    "pytest",
+    # deprecation warnings are not errors until they are in a supported Django version
+    {replace = "if", condition = "factor.djangomain", then = ["-W", "default::django.utils.deprecation.RemovedInNextVersionWarning"], extend = true},
+    {replace = "posargs", default = [], extend = true}
+]]
 dependency_groups = ["dev"]
 deps = [
   {replace = "if", condition = "factor.django42", then = ["Django>=4.2,<5.0"], extend = true},
