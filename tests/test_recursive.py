@@ -395,7 +395,7 @@ class TestRecursiveCTE(TestCase):
             cte,
             select=cte.join(Region, name=cte.col.name)
             .annotate(is_cycle=cte.col.is_cycle)
-            .order_by("name")
+            .order_by("name", "is_cycle")
         )
         query_str = str(regions.query)
         print(query_str)
@@ -435,7 +435,7 @@ class TestRecursiveCTE(TestCase):
             cte,
             select=cte.join(Region, name=cte.col.regionName)
             .annotate(is_cycle=cte.col.is_cycle)
-            .order_by("name")
+            .order_by("name", "is_cycle")
         )
         self.assertIn('CYCLE "regionName"', str(regions.query))
 
@@ -515,7 +515,7 @@ class TestRecursiveCTE(TestCase):
                 cycle_detected=cte.col.cycle_detected,
                 cycle_path=cte.col.cycle_path,
             )
-            .order_by("name")
+            .order_by("name", "cycle_detected")
         )
         query_str = str(regions.query)
         print(query_str)
@@ -613,7 +613,7 @@ class TestRecursiveCTE(TestCase):
             cte,
             select=cte.join(Region, name=cte.col.name)
             .annotate(is_cycle=cte.col.is_cycle)
-            .order_by("name")
+            .order_by("name", "is_cycle")
         )
         query_str = str(regions.query)
         print(query_str)
@@ -660,7 +660,7 @@ class TestRecursiveCTE(TestCase):
             cte,
             select=cte.join(Region, name=cte.col.name)
             .annotate(is_cycle=cte.col.is_cycle)
-            .order_by("name")
+            .order_by("name", "is_cycle")
         )
         query_str = str(regions.query)
         print(query_str)
