@@ -1,4 +1,5 @@
 from copy import copy
+from types import GenericAlias
 
 import django
 from django.db.models import Manager, sql
@@ -44,6 +45,10 @@ class CTE:
     :param materialized: Optional parameter (default: False) which enforce
     using of MATERIALIZED statement for supporting databases.
     """
+
+    # Allow `CTE[QuerySet[...]]` at runtime; the type parameter is
+    # declared in cte.pyi
+    __class_getitem__ = classmethod(GenericAlias)
 
     def __init__(self, queryset, name="cte", materialized=False):
         self._set_queryset(queryset)
@@ -226,9 +231,15 @@ class CTEQuerySet(QuerySet):
     as_manager = classmethod(as_manager)
 
 
+# Named base class, so `CTEManager` has the same base at runtime as in
+# cte.pyi, where it types the methods that `from_queryset()` copies
+# from `CTEQuerySet`.
+_CTEManagerBase = Manager.from_queryset(CTEQuerySet)
+
+
 @deprecated("CTEMAnager is deprecated. "
             "CTEs can now be applied to any queryset using `with_cte()`")
-class CTEManager(Manager.from_queryset(CTEQuerySet)):
+class CTEManager(_CTEManagerBase):
     """Manager for models that perform CTE queries"""
 
     @classmethod
