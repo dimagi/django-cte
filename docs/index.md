@@ -155,6 +155,140 @@ ORDER BY "path" ASC
 ```
 
 
+## Cycle Detection in Recursive CTEs
+
+Recursive queries can loop indefinitely if the data contains cycles. Some
+databases support a `CYCLE` clause, which stops the recursion when a row
+repeats. Support was added in PostgreSQL 14. On earlier versions, and on
+databases without it such as SQLite, cycle detection must be implemented in
+application logic.
+
+Pass the `cycle` parameter to `CTE.recursive()`, naming the CTE column(s)
+that identify a row:
+
+```py
+def make_regions_cte(cte):
+    return Region.objects.filter(
+        parent__isnull=True
+    ).values("name", "parent_id").union(
+        cte.join(Region, parent=cte.col.name).values("name", "parent_id"),
+        all=True,
+    )
+
+cte = CTE.recursive(make_regions_cte, cycle=["name"])
+```
+
+This generates a `CYCLE` clause with default settings:
+
+```sql
+WITH RECURSIVE "cte" AS (
+    ...
+) CYCLE "name" SET "is_cycle" USING "path"
+```
+
+The clause adds two columns to the CTE: a mark column, `is_cycle`, which is
+true on the row where a cycle was found, and a path column, `path`, holding
+the rows visited on the way to it. Reference them like any other CTE column,
+with `cte.col`:
+
+```py
+regions = with_cte(
+    cte,
+    select=cte.join(Region, name=cte.col.name)
+    .annotate(is_cycle=cte.col.is_cycle, path=cte.col.path)
+)
+```
+
+Neither name may collide with a column the CTE query already selects.
+PostgreSQL rejects such a query outright, whether or not the column is
+referenced. Rename them with the `set` and `using` keys of the dict form,
+which also controls the values assigned to the mark column:
+
+```py
+cte = CTE.recursive(
+    make_regions_cte,
+    cycle={
+        "columns": ["name", "parent_id"],  # columns to track
+        "set": "cycle_detected",           # mark column name
+        "to": "Y",                         # mark value when a cycle is detected
+        "default": "N",                    # mark value otherwise
+        "using": "cycle_path",             # path column name
+    }
+)
+```
+
+This generates:
+
+```sql
+WITH RECURSIVE "cte" AS (
+    ...
+) CYCLE "name", "parent_id" SET "cycle_detected" TO 'Y' DEFAULT 'N' USING "cycle_path"
+```
+
+`to` and `default` take a bool, int, float, str, date or datetime. PostgreSQL
+does not accept query parameters in their place, so they are written into the
+SQL as constants. The type of `to` decides the output field of the mark column,
+here `TextField`. A `Value()` is taken like its value, with its own output
+field. Other constants can be passed as `RawSQL()` without params, which is
+written into the SQL as is:
+
+```py
+from django.db.models import DurationField
+from django.db.models.expressions import RawSQL
+
+cycle = {
+    "columns": ["name"],
+    "to": RawSQL("interval '1 day'", [], output_field=DurationField()),
+    "default": RawSQL("interval '0'", [], output_field=DurationField()),
+}
+```
+
+### Working with the USING Column
+
+PostgreSQL generates the path column as `ARRAY[RECORD]`, and Django has no
+field for that type. Its `output_field` therefore defaults to `TextField`,
+which applies no conversion and returns whatever the driver produced.
+
+The `using_output_field` key changes the field Django attaches to the column.
+It does not change the returned value, only which lookups are allowed.
+`ArrayField` adds `__len`. Other array lookups compare against the declared
+element type and fail, because the elements are anonymous records:
+
+```py
+from django.contrib.postgres.fields import ArrayField
+from django.db.models import TextField
+
+cte = CTE.recursive(
+    make_regions_cte,
+    cycle={
+        "columns": ["name"],
+        "using_output_field": ArrayField(TextField()),
+    }
+)
+```
+
+How the value arrives in Python depends on the driver. psycopg2 returns the
+array as a string, quoting a record only when its text needs escaping, such
+as when a value contains a comma or a space:
+
+```py
+'{(sun),(earth),(moon)}'
+```
+
+psycopg 3 adapts it to a list of tuples:
+
+```py
+[('sun',), ('earth',), ('moon',)]
+```
+
+Using `ArrayField` with psycopg2 needs additional list adaptation, because
+psycopg2 does not convert `ARRAY[RECORD]` to a list: it considers `RECORD` an
+unknown type. For more details, see:
+
+- [psycopg2 Lists Adaptation](https://www.psycopg.org/docs/usage.html#lists-adaptation)
+- [psycopg2 Cast Array Unknown](https://www.psycopg.org/docs/extensions.html#cast-array-unknown)
+
+
 ## Named Common Table Expressions
 
 It is possible to add more than one CTE to a query. To do this, each CTE must

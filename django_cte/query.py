@@ -94,7 +94,11 @@ def generate_cte_sql(connection, query, as_sql):
             as_sql()
             raise
         template = get_cte_query_template(cte)
-        ctes.append(template.format(name=qn(cte.name), query=cte_sql))
+        cte_sql = template.format(name=qn(cte.name), query=cte_sql)
+        if cte.cycle is not None:
+            # appended after format() because the clause may contain braces
+            cte_sql += " " + cte.cycle.as_sql(qn)
+        ctes.append(cte_sql)
         params.extend(cte_params)
 
     explain_attribute = "explain_info"
@@ -131,9 +135,11 @@ def generate_cte_sql(connection, query, as_sql):
 
 
 def get_cte_query_template(cte):
+    template = ["{name} AS"]
     if cte.materialized:
-        return "{name} AS MATERIALIZED ({query})"
-    return "{name} AS ({query})"
+        template.append("MATERIALIZED")
+    template.append("({query})")
+    return " ".join(template)
 
 
 def _ignore_with_col_aliases(cte_query):
