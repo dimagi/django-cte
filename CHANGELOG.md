@@ -1,5 +1,25 @@
 # Django CTE change log
 
+## Unreleased
+
+- Ship type stubs (`.pyi`) and a `py.typed` marker (PEP 561), so mypy,
+  pyright and editors type-check code using django-cte.
+  - `CTE` is generic over the type of its body queryset, e.g.
+    `CTE[QuerySet[Order, dict[str, Any]]]`, and it can be subscripted at
+    runtime.
+  - `with_cte()` and `CTE.join()` return the queryset type matching the
+    given model, queryset or CTE; `CTE()` infers the body type
+    (`CTE[...]`) from the given queryset or raw CTE SQL, and
+    `CTE.recursive()` from what `make_cte_queryset` returns;
+    `CTE.queryset()` returns the CTE's body queryset type.
+  - Type checkers report the deprecated `With`, `CTEQuerySet` and
+    `CTEManager` as deprecated.
+- `raw_cte_sql()` returns a subclass of the new `RawCTEQuerySet` marker
+  class (`django_cte.raw.RawCTEQuerySet`).
+- **BREAKING:** the `relabels` parameter of `CTEColumn.relabeled_clone()` is
+  renamed to `change_map`, as in Django. Only keyword calls
+  (`relabeled_clone(relabels=...)`) break; Django passes it by position.
+
 ## 4.0.0 - 2026-08-28
 
 - **BREAKING** Dropped support for Python 3.9 (EOL 2025-10-31).
