@@ -741,6 +741,18 @@ class TestCTE(TestCase):
         # Executing the query should not raise TypeError: 'NoneType' object is not subscriptable
         self.assertEqual(list(qs), [{"user_name": "admin", "c": 22}])
 
+    def test_queryset_only_and_defer(self):
+        cte = CTE(Order.objects.filter(region__parent="sun"))
+        qs = with_cte(cte, select=cte).order_by("id")
+
+        only = qs.only("amount")[0]
+        self.assertEqual(only.get_deferred_fields(), {"region_id", "user_id"})
+        self.assertEqual(only.amount, 10)
+
+        deferred = qs.defer("amount")[0]
+        self.assertEqual(deferred.get_deferred_fields(), {"amount"})
+        self.assertEqual(deferred.region_id, "mercury")
+
     def test_django52_annotate_model_field_name_after_queryset(self):
         # Select the `id` field in one CTE
         cte = CTE(Order.objects.values("id", "region", "user_id"))
