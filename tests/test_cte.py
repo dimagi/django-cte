@@ -1,3 +1,6 @@
+import pickle
+from unittest.mock import patch
+
 import pytest
 import django
 from django.db.models import IntegerField, TextField
@@ -752,6 +755,21 @@ class TestCTE(TestCase):
         deferred = qs.defer("amount")[0]
         self.assertEqual(deferred.get_deferred_fields(), {"amount"})
         self.assertEqual(deferred.region_id, "mercury")
+
+    def test_unpickle_pre_v3_cached_results(self):
+        # This verifies correct behavior of unpickling v2 pickle state.
+        # It does not replicate the JITMixin pickle bug fixed in v5.0.0.
+        def v3_getstate(self):
+            return (self.query, self.name, self.materialized)
+
+        cte = CTE(Order.objects.filter(region__parent="sun"))
+        qs = with_cte(cte, select=cte).order_by("id")
+        with patch.object(CTE, "__getstate__", v3_getstate):
+            pickled = pickle.dumps(qs)  # evaluates qs, pickles results
+
+        orders = pickle.loads(pickled)
+        with self.assertNumQueries(0):
+            self.assertEqual(orders[0].region_id, "mercury")
 
     def test_django52_annotate_model_field_name_after_queryset(self):
         # Select the `id` field in one CTE
