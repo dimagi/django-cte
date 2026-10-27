@@ -370,9 +370,11 @@ produce the desired SQL.
 
 ## Materialized CTE
 
-Both PostgreSQL 12+ and sqlite 3.35+ supports `MATERIALIZED` keyword for CTE
-queries. To enforce usage of this keyword add `materialized` as a parameter of
-`CTE(..., materialized=True)`.
+Both PostgreSQL 12+ and sqlite 3.35+ support the `MATERIALIZED` and
+`NOT MATERIALIZED` keywords for CTE queries. Use `CTE(..., materialized=True)`
+to generate `MATERIALIZED` or `CTE(..., materialized=False)` to generate
+`NOT MATERIALIZED`. The default (`materialized=None`) omits the keyword and
+lets the database decide.
 
 
 ```py
