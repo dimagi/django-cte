@@ -1,5 +1,10 @@
 # Django CTE change log
 
+## 5.0.1 - 2026-10-27
+
+- Restored unpickling of CTEs pickled with django-cte versions prior to 3.0.
+  The 5.0.0 breaking change that removed it no longer applies.
+
 ## 5.0.0 - 2026-10-27
 
 - **BREAKING:** Passing `materialized=False` when constructing a `CTE` will now

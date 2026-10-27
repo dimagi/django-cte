@@ -55,7 +55,12 @@ class CTE:
         return (self.query, self.name, self.materialized, self._iterable_class)
 
     def __setstate__(self, state):
-        self.query, self.name, self.materialized, self._iterable_class = state
+        if len(state) == 3:
+            # Keep compatibility with the previous serialization method
+            self.query, self.name, self.materialized = state
+            self._iterable_class = ValuesIterable
+        else:
+            self.query, self.name, self.materialized, self._iterable_class = state
         self.col = CTEColumns(self)
 
     def __repr__(self):
