@@ -3,7 +3,7 @@ from copy import copy
 import django
 from django.db.models import Manager, sql
 from django.db.models.expressions import Ref
-from django.db.models.query import Q, QuerySet, ValuesIterable
+from django.db.models.query import ModelIterable, Q, QuerySet, ValuesIterable
 from django.db.models.sql.datastructures import BaseTable
 
 from .jitmixin import jit_mixin
@@ -135,7 +135,10 @@ class CTE:
         cte_query = self.query
         qs = cte_query.model._default_manager.get_queryset()
         qs._iterable_class = self._iterable_class
-        qs._fields = ()  # Allow any field names to be used in further annotations
+        if self._iterable_class is not ModelIterable:
+            # Allow any field names to be used in further annotations.
+            # Not done for model querysets, which would break only()/defer().
+            qs._fields = ()
 
         query = jit_mixin(sql.Query(cte_query.model), CTEQuery)
         query.join(BaseTable(self.name, None))

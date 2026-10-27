@@ -5,6 +5,9 @@
 - Passing `materialized=False` when constructing a `CTE` will now generate a
   common table expression with `NOT MATERIALIZED`. Use `None` or do not specify
   a value in order to omit the `MATERIALIZED` specification.
+- Fixed `TypeError: Cannot call only() after .values() or .values_list()`
+  when calling `.only()` or `.defer()` on a `CTE.queryset()` of a model
+  queryset (regression in 3.0.0).
 
 ## 4.0.0 - 2026-08-28
 
