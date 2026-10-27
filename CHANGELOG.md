@@ -1,13 +1,18 @@
 # Django CTE change log
 
-## Unreleased
+## 5.0.0 - 2026-10-27
 
-- Passing `materialized=False` when constructing a `CTE` will now generate a
-  common table expression with `NOT MATERIALIZED`. Use `None` or do not specify
-  a value in order to omit the `MATERIALIZED` specification.
+- **BREAKING:** Passing `materialized=False` when constructing a `CTE` will now
+  generate a common table expression with `NOT MATERIALIZED`. Use `None` or do
+  not specify a value in order to omit the `MATERIALIZED` specification
+  ([#142](https://github.com/dimagi/django-cte/pull/142)).
+- **BREAKING:** CTEs pickled with django-cte versions prior to 3.0 can no
+  longer be unpickled ([#142](https://github.com/dimagi/django-cte/pull/142)).
+  However, query pickling was broken from 2.0.0 through 4.0.0. See next item.
+- Fixed pickling of CTE queries ([#147](https://github.com/dimagi/django-cte/pull/147)).
 - Fixed `TypeError: Cannot call only() after .values() or .values_list()`
   when calling `.only()` or `.defer()` on a `CTE.queryset()` of a model
-  queryset (regression in 3.0.0).
+  queryset (regression in 3.0.0) ([#152](https://github.com/dimagi/django-cte/pull/152)).
 
 ## 4.0.0 - 2026-08-28
 
