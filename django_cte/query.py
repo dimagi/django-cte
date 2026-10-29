@@ -97,7 +97,7 @@ def generate_cte_sql(connection, query, as_sql):
         cte_sql = template.format(name=qn(cte.name), query=cte_sql)
         if cte.cycle is not None:
             # appended after format() because the clause may contain braces
-            cte_sql += " " + cte.cycle.as_sql(qn)
+            cte_sql += " " + cte.cycle.as_sql(qn, connection)
         ctes.append(cte_sql)
         params.extend(cte_params)
 

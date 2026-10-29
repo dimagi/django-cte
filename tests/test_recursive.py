@@ -675,6 +675,9 @@ class TestRecursiveCTE(TestCase):
         self.assertIn('SET "{mark}"', str(regions.query))
 
     def test_cycle_mark_value_sql(self):
+        if connection.vendor == "sqlite":
+            raise SkipTest("SQLite does not support CYCLE clause")
+
         def make_regions_cte(cte):
             return Region.objects.filter(name="sun").values("name").union(
                 cte.join(Region, parent=cte.col.name).values("name"),
@@ -686,7 +689,7 @@ class TestRecursiveCTE(TestCase):
             (-1, 0, "TO bigint '-1' DEFAULT 0"),
             (1.5, 0.5, "TO float8 '1.5' DEFAULT float8 '0.5'"),
             ("it's", "50%", "TO 'it''s' DEFAULT '50%'"),
-            ("a\\b", "{x}", "TO E'a\\\\b' DEFAULT '{x}'"),
+            ("{x}", "N", "TO '{x}' DEFAULT 'N'"),
             (
                 date(2020, 1, 1), date(1970, 1, 1),
                 "TO date '2020-01-01' DEFAULT date '1970-01-01'",
@@ -718,6 +721,14 @@ class TestRecursiveCTE(TestCase):
                     cte, select=cte.join(Region, name=cte.col.name)
                 )
                 self.assertIn(sql, str(regions.query))
+
+        cte = CTE.recursive(make_regions_cte, cycle={
+            "columns": ["name"], "to": "a\x00b", "default": "c",
+        })
+        regions = with_cte(cte, select=cte.join(Region, name=cte.col.name))
+        # psycopg2 raises ValueError, psycopg 3 DataError
+        with self.assertRaisesRegex(Exception, r"NUL \(0x00\)"):
+            str(regions.query)
 
     def test_cycle_mark_values(self):
         if connection.vendor == "sqlite":

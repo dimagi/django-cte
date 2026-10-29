@@ -1,14 +1,6 @@
 import datetime
 
-from django.db.models import (
-    BooleanField,
-    CharField,
-    DateField,
-    DateTimeField,
-    FloatField,
-    IntegerField,
-    TextField,
-)
+from django.db.models import TextField
 from django.db.models.expressions import RawSQL, Value
 from django.utils import timezone
 
@@ -63,8 +55,8 @@ class CycleClause:
         self.mark_column = mark_column
         self.cycle_value = cycle_value
         self.default_value = default_value
-        self.cycle_sql, mark_field = compile_mark_value(cycle_value)
-        self.default_sql, default_field = compile_mark_value(default_value)
+        mark_field = get_mark_field(cycle_value)
+        default_field = get_mark_field(default_value)
         if type(mark_field) is not type(default_field):
             raise ValueError(
                 "CYCLE mark values must have the same type, got "
@@ -112,10 +104,11 @@ class CycleClause:
             f"got {type(cycle).__name__}"
         )
 
-    def as_sql(self, qn):
+    def as_sql(self, qn, connection):
         """Get the CYCLE clause SQL
 
         :param qn: Name quoting function.
+        :param connection: Connection the query is compiled for.
         :returns: The CYCLE clause SQL string.
         """
         sql = [
@@ -123,52 +116,59 @@ class CycleClause:
             "SET", qn(self.mark_column),
         ]
         if self.cycle_value is not True or self.default_value is not False:
-            sql.extend(["TO", self.cycle_sql, "DEFAULT", self.default_sql])
+            sql.extend([
+                "TO", compile_mark_value(self.cycle_value, connection),
+                "DEFAULT", compile_mark_value(self.default_value, connection),
+            ])
         sql.extend(["USING", qn(self.path_column)])
         return " ".join(sql)
 
 
-def compile_mark_value(value):
-    """Get the SQL and the output field of a mark column value
+def get_mark_field(value):
+    """Get the output field of a mark column value
+
+    A plain value gets the output field `Value()` gives it, so "Y" and
+    `Value("N")` match.
+    """
+    if isinstance(value, RawSQL):
+        if value.params:
+            raise ValueError("CYCLE mark RawSQL must not have params")
+        return value.output_field
+    if not isinstance(value, Value):
+        value = Value(value)
+    if not isinstance(value.value, (bool, int, float, str, datetime.date)):
+        raise ValueError(
+            "CYCLE mark values must be a bool, int, float, str, date, "
+            f"datetime, Value or RawSQL, got {value.value!r}"
+        )
+    return value.output_field
+
+
+def compile_mark_value(value, connection):
+    """Get the SQL of a mark column value
 
     PostgreSQL accepts only constants in TO and DEFAULT, not parameters
     or casts, so the value is written into the SQL.
     """
-    if isinstance(value, Value):
-        sql, _ = compile_mark_value(value.value)
-        return sql, value.output_field
     if isinstance(value, RawSQL):
-        if value.params:
-            raise ValueError("CYCLE mark RawSQL must not have params")
-        return value.sql, value.output_field
-    if isinstance(value, bool):
-        return ("true" if value else "false"), BooleanField()
-    if isinstance(value, int):
-        if value < 0:
-            # a bare -1 is a syntax error, a typed literal is not
-            return f"bigint '{int(value)}'", IntegerField()
-        return str(int(value)), IntegerField()
-    if isinstance(value, float):
-        # a bare 1.5 is numeric, which the driver returns as Decimal
-        return f"float8 '{float(value)!r}'", FloatField()
-    if isinstance(value, str):
-        # the field Value() gives a str, so "Y" and Value("N") match
-        return quote_string(value), CharField()
+        return value.sql
+    if isinstance(value, Value):
+        value = value.value
+    # the driver writes these with a cast, a sign or as numeric, so they
+    # are written as a typed literal of their text instead
+    type_name = None
     if isinstance(value, datetime.datetime):
         type_name = "timestamptz" if timezone.is_aware(value) else "timestamp"
-        return f"{type_name} '{value.isoformat()}'", DateTimeField()
-    if isinstance(value, datetime.date):
-        return f"date '{value.isoformat()}'", DateField()
-    raise ValueError(
-        "CYCLE mark values must be a bool, int, float, str, date, "
-        f"datetime, Value or RawSQL, got {value!r}"
-    )
-
-
-def quote_string(value):
+        value = value.isoformat()
+    elif isinstance(value, datetime.date):
+        type_name, value = "date", value.isoformat()
+    elif isinstance(value, float):
+        type_name, value = "float8", repr(value)
+    elif isinstance(value, int) and value < 0:
+        type_name, value = "bigint", str(value)
+    # strip() drops the space psycopg writes before E'' and negative numbers
+    sql = connection.ops.compose_sql("%s", [value]).strip()
+    if type_name is not None:
+        sql = f"{type_name} {sql}"
     # doubled % survives the driver's parameter interpolation
-    value = value.replace("'", "''").replace("%", "%%")
-    if "\\" in value:
-        # E'' reads backslashes as escapes whatever standard_conforming_strings is
-        return "E'" + value.replace("\\", "\\\\") + "'"
-    return "'" + value + "'"
+    return sql.replace("%", "%%")
