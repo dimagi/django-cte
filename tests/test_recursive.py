@@ -703,6 +703,7 @@ class TestRecursiveCTE(TestCase):
                 "DEFAULT timestamptz '1970-01-01T00:00:00+00:00'",
             ),
             (Value("Y"), Value("N"), "TO 'Y' DEFAULT 'N'"),
+            ("Y", Value("N"), "TO 'Y' DEFAULT 'N'"),
             (
                 RawSQL("int2 '1'", [], output_field=int_field),
                 RawSQL("int2 '0'", [], output_field=int_field),
@@ -788,6 +789,17 @@ class TestRecursiveCTE(TestCase):
             ({"columns": ["name"], "default": b"N"}, "got b'N'"),
             ({"columns": ["name"], "to": Value(None)}, "got None"),
             ({"columns": ["name"], "to": RawSQL("%s", [1])}, "params"),
+            ({"columns": ["name"], "to": True, "default": 0}, "same type"),
+            ({"columns": ["name"], "to": 1, "default": 0.5}, "same type"),
+            ({"columns": ["name"], "to": "1", "default": 0}, "same type"),
+            (
+                {
+                    "columns": ["name"],
+                    "to": date(2020, 1, 1),
+                    "default": datetime(1970, 1, 1),
+                },
+                "same type",
+            ),
         ]:
             with self.subTest(cycle=cycle):
                 with self.assertRaisesRegex(ValueError, message):

@@ -2,6 +2,7 @@ import datetime
 
 from django.db.models import (
     BooleanField,
+    CharField,
     DateField,
     DateTimeField,
     FloatField,
@@ -31,7 +32,8 @@ class CycleClause:
     its value, but with its output field. A `RawSQL` without params is
     written into the query as is, for other constants.
     :param default_value: Value of the mark column when no cycle is
-    detected (default: False).
+    detected (default: False). Its output field must be of the same type
+    as the one of `cycle_value`.
     :param path_column: Name of the generated path column (default:
     "path").
     :param path_output_field: Output field of the path column (default:
@@ -62,7 +64,13 @@ class CycleClause:
         self.cycle_value = cycle_value
         self.default_value = default_value
         self.cycle_sql, mark_field = compile_mark_value(cycle_value)
-        self.default_sql, _ = compile_mark_value(default_value)
+        self.default_sql, default_field = compile_mark_value(default_value)
+        if type(mark_field) is not type(default_field):
+            raise ValueError(
+                "CYCLE mark values must have the same type, got "
+                f"{cycle_value!r} ({type(mark_field).__name__}) and "
+                f"{default_value!r} ({type(default_field).__name__})"
+            )
         self.path_column = path_column
         self.path_output_field = path_output_field or TextField()
         self.output_columns = {
@@ -144,7 +152,8 @@ def compile_mark_value(value):
         # a bare 1.5 is numeric, which the driver returns as Decimal
         return f"float8 '{float(value)!r}'", FloatField()
     if isinstance(value, str):
-        return quote_string(value), TextField()
+        # the field Value() gives a str, so "Y" and Value("N") match
+        return quote_string(value), CharField()
     if isinstance(value, datetime.datetime):
         type_name = "timestamptz" if timezone.is_aware(value) else "timestamp"
         return f"{type_name} '{value.isoformat()}'", DateTimeField()
